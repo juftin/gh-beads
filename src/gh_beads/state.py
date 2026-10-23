@@ -38,8 +38,38 @@ class SyncState:
                 for field in ("checkpoint", "last_full_at", "last_success_at"):
                     self.timestamp(entry.get(field, 0))
             self.timestamp(data.get("retry_at", 0))
+            inventories = data.get("inventories", {})
+            if not isinstance(inventories, dict):
+                raise ValueError("Invalid repository inventories")
+            for inventory in inventories.values():
+                if not isinstance(inventory, dict) or not isinstance(
+                    inventory.get("repositories"), list
+                ):
+                    raise ValueError("Invalid repository inventory")
+                self.timestamp(inventory.get("discovered_at", 0))
+                for repo in inventory["repositories"]:
+                    if not isinstance(repo, dict) or not all(
+                        isinstance(repo.get(key), str) and repo[key] for key in ("node_id", "name")
+                    ):
+                        raise ValueError("Invalid inventory repository")
             self.data = data
             self._saved = json.dumps(data, sort_keys=True) + "\n"
+
+    @staticmethod
+    def scope_key(scopes: str) -> str:
+        """Treat ordering, duplicates, and GitHub name casing as the same selection."""
+        return ";".join(
+            sorted({scope.strip().lower() for scope in scopes.split(";") if scope.strip()})
+        )
+
+    def inventory(self, scopes: str, repos: list[dict[str, Any]], *, now: float) -> None:
+        """Remember discovery separately for configured and selectively refreshed portfolios."""
+        self.data.setdefault("inventories", {})[self.scope_key(scopes)] = {
+            "discovered_at": now,
+            "repositories": [
+                {"node_id": repo["node_id"], "name": repo["full_name"]} for repo in repos
+            ],
+        }
 
     @staticmethod
     def timestamp(value: Any) -> float:

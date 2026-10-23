@@ -25,7 +25,7 @@ RUN set -eu; \
     install "dolt-linux-${TARGETARCH}/bin/dolt" /usr/local/bin/dolt; \
     rm -rf /tmp/*
 
-WORKDIR /opt/beads-hub
+WORKDIR /opt/gh-beads
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-dev --no-install-project --python /usr/bin/python3
 RUN npm install -g "beads-ui@${BEADS_UI_VERSION}" && npm cache clean --force
@@ -33,7 +33,7 @@ COPY README.md ./
 COPY src/ ./src/
 RUN uv sync --locked --no-dev --no-editable --python /usr/bin/python3
 COPY scripts/*.sh /usr/local/bin/
-ENV PATH="/opt/beads-hub/.venv/bin:$PATH" \
+ENV PATH="/opt/gh-beads/.venv/bin:$PATH" \
     BEADS_PATH=/usr/local/bin/bd \
     BEADS_WORKING_DIR=/var/lib/beads \
     BEADS_DIR=/var/lib/beads/.beads \
@@ -41,7 +41,7 @@ ENV PATH="/opt/beads-hub/.venv/bin:$PATH" \
     BEADS_DOLT_SERVER_HOST=127.0.0.1 \
     BEADS_DOLT_SERVER_PORT=3307 \
     BEADS_DOLT_AUTO_START=0 \
-    BEADS_ACTOR=beads-hub \
+    BEADS_ACTOR=gh-beads \
     BD_BIN=/usr/local/bin/bd
 WORKDIR /var/lib/beads
 EXPOSE 3000 3307 8080

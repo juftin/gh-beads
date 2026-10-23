@@ -4,8 +4,8 @@ The default local workflow stores the backlog inside a repository under `.beads/
 
 ```mermaid
 flowchart LR
-    GitHub[GitHub] --> Poller[uv: beads-hub-sync]
-    Agent[MCP client] -->|stdio| MCP[uv: beads-hub-mcp]
+    GitHub[GitHub] --> Poller[uv: gh-beads-sync]
+    Agent[MCP client] -->|stdio| MCP[uv: gh-beads-mcp]
     MCP -->|Sync trigger| Reconcile[Shared reconciliation code]
     Poller --> BD[bd with embedded Dolt]
     Reconcile --> BD
@@ -17,7 +17,7 @@ flowchart LR
 
 Install Python 3.11+, uv, and [Beads 1.3.1](https://github.com/gastownhall/beads/releases/tag/v1.3.1) with embedded Dolt support. The tested macOS ARM64 release includes it; embedded support requires a CGO-enabled Beads build. Put `bd` on your shell's `PATH`. uv installs the Python dependencies, while the embedded database engine is part of `bd`.
 
-From the beads-hub checkout:
+From the gh-beads checkout:
 
 ```sh
 uv sync --locked
@@ -45,7 +45,7 @@ your-repository/
 └── .github-sync.lock
 ```
 
-The beads-hub checkout ignores these paths in Git. When using another repository, add the same paths to its ignore rules. Dolt maintains its own database history; preserve the database files and workspace metadata together for backups.
+The gh-beads checkout ignores these paths in Git. When using another repository, add the same paths to its ignore rules. Dolt maintains its own database history; preserve the database files and workspace metadata together for backups.
 
 ## 2. Run the GitHub poller
 
@@ -54,25 +54,25 @@ Inject `GH_TOKEN` securely into the poller's environment, then run from the init
 ```sh
 : "${GH_TOKEN:?Inject a GitHub read credential}"
 export GH_SYNC_QUERY='user:@me'
-uv run --locked beads-hub-sync --loop --interval 120
+uv run --locked gh-beads-sync --loop --interval 120
 ```
 
 Keep one poller running while you want automatic updates. The CLI defaults to the current repository for database access, sync locking, and progress. Use `--interval` for the native pause; `GH_SYNC_INTERVAL` configures the Compose command. Repository scopes, incremental reads, PR evidence refresh, and local-field ownership are the same in both deployments.
 
-To sync only named repositories, set `GH_SYNC_QUERY='repo:example/api;repo:example/web'` or pass repeated `--repo` flags, for example `uv run --locked beads-hub-sync --repo example/api --repo example/web --loop`. Flags replace configured scopes for that process. Each selected GitHub repository becomes an epic containing its imported issues and PRs. See [selection and epic behavior](usage.md#select-repositories).
+To sync only named repositories, set `GH_SYNC_QUERY='repo:example/api;repo:example/web'` or pass repeated `--repo` flags, for example `uv run --locked gh-beads-sync --repo example/api --repo example/web --loop`. Flags replace configured scopes for that process. Each selected GitHub repository becomes an epic containing its imported issues and PRs. See [selection and epic behavior](usage.md#select-repositories).
 
 From another terminal in that repository:
 
 ```sh
-uv run --locked beads-hub-sync --status
-uv run --locked beads-hub-sync --full
+uv run --locked gh-beads-sync --status
+uv run --locked gh-beads-sync --full
 bd ready --label 'type:pr' --json
 ```
 
 One-shot source sync requires `GH_TOKEN`; progress inspection and reading existing work do not. For a repository other than the code checkout, select the installed project without changing the working directory:
 
 ```sh
-uv run --project /absolute/path/to/beads-hub --locked beads-hub-sync --status
+uv run --project /absolute/path/to/gh-beads --locked gh-beads-sync --status
 ```
 
 Alternatively, set `BEADS_WORKING_DIR` to the absolute path of the initialized repository. Use the same workspace for every poller, CLI call, and MCP session so they share the lock and checkpoints. A shared hub can still import work from many GitHub repositories into this one local database.
@@ -87,8 +87,8 @@ Configure your client to launch the wrapper through uv. `BEADS_WORKING_DIR` poin
     "beads": {
       "command": "uv",
       "args": [
-        "run", "--project", "/absolute/path/to/beads-hub",
-        "--locked", "beads-hub-mcp"
+        "run", "--project", "/absolute/path/to/gh-beads",
+        "--locked", "gh-beads-mcp"
       ],
       "env": {
         "BEADS_WORKING_DIR": "/absolute/path/to/your-repository",
@@ -104,7 +104,7 @@ Configure your client to launch the wrapper through uv. `BEADS_WORKING_DIR` poin
 Replace all example paths with actual absolute paths; client environment values do not automatically expand `$HOME` or `~`. Use an absolute `command` path if the client cannot find uv. Stdio is the wrapper's default transport; `MCP_TRANSPORT=stdio` can also select it explicitly. The normal terminal command is:
 
 ```sh
-uv run --locked beads-hub-mcp
+uv run --locked gh-beads-mcp
 ```
 
 The command expects an MCP client on stdin/stdout. It starts no HTTP listener, and runtime logs use stderr. Startup checks database access through `bd info`, which works with either embedded or server-backed workspaces. The official tools, `beads://quickstart`, and synchronous `trigger_github_sync` tool remain available.
@@ -121,10 +121,10 @@ Stop the poller with Ctrl-C and close stdio sessions through their MCP client. L
 
 Existing server-mode metadata keeps using its configured SQL server. The local default change does not convert or move that database. Keep the existing connection settings for those workspaces; use a fresh repository for the embedded workflow until choosing an explicit data migration.
 
-For centralized access, the [Compose deployment](usage.md#deploy-with-docker-compose) still runs one shared Dolt SQL server and HTTP/SSE MCP. A host-side stdio client can connect through the dedicated remote pointer in [AGENTS.md](../AGENTS.md#compose-sql-clients). Such a pointer has its own lock/progress files, so run source reconciliation inside Compose through `task sync-now` or its HTTP MCP trigger.
+For centralized access, the [Compose deployment](usage.md#deploy-with-docker-compose) still runs one shared Dolt SQL server and HTTP/SSE MCP. A host-side stdio client can connect through the dedicated remote pointer in [the SQL client guide](usage.md#compose-sql-clients). Such a pointer has its own lock/progress files, so run source reconciliation inside Compose through `task sync-now` or its HTTP MCP trigger.
 
 ## Validation
 
-`task smoke-local` uses native `bd` to initialize an isolated temporary Git repository. It exercises real embedded writes, dependencies, no-op reconciliation, overlapping poller writes and stdio MCP reads, shared trigger locking, and persistence across new client processes. It uses synthetic GitHub data and requires neither Docker nor a GitHub credential. Set `BEADS_PATH` if the tested native binary is not on `PATH`.
+`task smoke-local` uses native `bd` to initialize an isolated temporary Git repository. It exercises real embedded writes, dependencies, no-op reconciliation, overlapping poller writes and stdio MCP reads, portfolio snapshots, saved reviews, shared trigger locking, and persistence across new client processes. `task smoke-restore` additionally backs up the stopped embedded workspace and progress file, restores into an independent repository, compares complete source/local fields and graph/history/checkpoints, and verifies zero-write sync replay. Both use synthetic GitHub data without Docker or a GitHub credential. Set `BEADS_PATH` if the tested native binary is not on `PATH`.
 
-The offline suite covers current-repository defaults and installed stdio startup with and without explicit environment settings. `task smoke` separately verifies the Compose SQL/HTTP/stdio workflow. Native embedded validation currently covers ARM64 macOS with the pinned Beads release; other native platforms and credentialed GitHub behavior remain unverified.
+The offline suite covers current-repository defaults and installed stdio startup with and without explicit environment settings. `task smoke` separately covers Compose SQL/HTTP/stdio and independent volume restore. Native embedded validation covers ARM64 macOS and AMD64 Linux; the latest review/snapshot and restore checks pass on AMD64 Linux. The updated Docker smoke awaits execution on a Docker host; credentialed GitHub behavior remains unverified.

@@ -13,9 +13,9 @@ import pytest
 from fixtures import FixtureGitHub, item, repository
 from test_sync import MemoryBeads
 
-from beads_hub import sync
-from beads_hub.github import node_metadata
-from beads_hub.state import FULL_SCAN_SECONDS, OVERLAP_SECONDS, SyncState
+from gh_beads import sync
+from gh_beads.github import node_metadata
+from gh_beads.state import FULL_SCAN_SECONDS, OVERLAP_SECONDS, SyncState
 
 
 def test_unchanged_poll_has_no_beads_writes() -> None:
@@ -223,7 +223,7 @@ def test_checkpoint_replace_failure_replays_committed_beads(
         raise OSError("Synthetic interrupted checkpoint commit")
 
     with monkeypatch.context() as patch:
-        patch.setattr("beads_hub.state.os.replace", fail_replace)
+        patch.setattr("gh_beads.state.os.replace", fail_replace)
         with pytest.raises(OSError, match="checkpoint"):
             sync.reconcile(source, beads, "user:@me", state)
     replay = SyncState(path)
@@ -254,7 +254,7 @@ def test_progress_is_committed_once_per_pass(
         replacements += 1
         original_replace(source, target)
 
-    monkeypatch.setattr("beads_hub.state.os.replace", count_replace)
+    monkeypatch.setattr("gh_beads.state.os.replace", count_replace)
     result = sync.reconcile(source, beads, "user:@me", state)
     assert result["status"] == ("partial" if failed else "complete")
     assert replacements == 1

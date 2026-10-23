@@ -16,7 +16,7 @@ from fastmcp import Client
 from fastmcp.client.transports import StdioTransport
 from fixtures import FixtureGitHub, item
 
-from beads_hub.sync import Beads, run_sync
+from gh_beads.sync import Beads, run_sync
 
 
 async def check_clients(source: FixtureGitHub, beads: Beads) -> None:
@@ -24,11 +24,21 @@ async def check_clients(source: FixtureGitHub, beads: Beads) -> None:
     issue_id = next(row["id"] for row in beads.items() if row["metadata"]["hub"]["kind"] == "issue")
     beads.call("update", issue_id, "--priority", "1", "--notes", "Synthetic local reasoning")
     for session in range(2):
-        transport = StdioTransport(command="beads-hub-mcp", args=[], env=dict(os.environ))
+        transport = StdioTransport(command="gh-beads-mcp", args=[], env=dict(os.environ))
         async with asyncio.timeout(180), Client(transport) as client:
             assert "ready" in {tool.name for tool in await client.list_tools()}
             assert await client.read_resource("beads://quickstart")
             if session == 0:
+                reviewed = await client.call_tool(
+                    "record_triage",
+                    {
+                        "bead_id": issue_id,
+                        "rationale": "Synthetic source review",
+                        "next_action": "Read next source change",
+                        "reviewer": "smoke-agent",
+                    },
+                )
+                assert reviewed.data["review_count"] == 1
 
                 async def poll() -> None:
                     """Write changed snapshots through the normal sync lock and checkpoints."""
@@ -50,6 +60,9 @@ async def check_clients(source: FixtureGitHub, beads: Beads) -> None:
                     assert result.data["status"] == "busy"
             result = await client.call_tool("show", {"issue_id": issue_id})
             assert not result.is_error
+            snapshot = await client.call_tool("portfolio_snapshot", {})
+            assert snapshot.data["coverage"]["status"] == "complete"
+            assert snapshot.data["queues"]["changed_since_review"]["items"][0]["id"] == issue_id
     rows = beads.items()
     issue = next(row for row in rows if row["id"] == issue_id)
     assert len(rows) == 3 and issue["title"].endswith("Synthetic revision 1")
@@ -67,7 +80,7 @@ def main() -> None:
         raise RuntimeError("Install native bd 1.3.1 with embedded Dolt support to run smoke-local")
     bd = str(Path(bd).resolve())
     original = Path.cwd()
-    with tempfile.TemporaryDirectory(prefix="beads-hub-embedded-") as directory:
+    with tempfile.TemporaryDirectory(prefix="gh-beads-embedded-") as directory:
         workspace = Path(directory)
         subprocess.run(["git", "init", "--quiet", str(workspace)], check=True)
         env = {
@@ -109,12 +122,12 @@ def main() -> None:
                 source = FixtureGitHub([issue, pr])
                 source.client = MagicMock()
                 source.retry_at = 0
-                with patch("beads_hub.sync.GitHub", return_value=source):
+                with patch("gh_beads.sync.GitHub", return_value=source):
                     result = run_sync()
                     assert result["status"] == "complete", result
                     asyncio.run(check_clients(source, Beads()))
                 status = subprocess.run(
-                    ["beads-hub-sync", "--status"],
+                    ["gh-beads-sync", "--status"],
                     check=True,
                     capture_output=True,
                     text=True,

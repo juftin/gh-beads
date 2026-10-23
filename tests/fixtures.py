@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import copy
 
-from beads_hub import sync
-from beads_hub.github import GitHub, node_metadata, source_metadata
+from gh_beads import sync
+from gh_beads.github import GitHub, node_metadata, source_metadata
 
 
 def repository(name: str = "example/orbit", node_id: str = "R_1") -> sync.Json:

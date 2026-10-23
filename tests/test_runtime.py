@@ -8,7 +8,7 @@ from typing import Any
 
 import pytest
 
-from beads_hub.runtime import configure_remote_access, wait_for_hub
+from gh_beads.runtime import configure_remote_access, wait_for_hub
 
 
 def test_wait_for_local_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -32,22 +32,39 @@ def test_wait_for_local_workspace(tmp_path: Path, monkeypatch: pytest.MonkeyPatc
     assert calls == 1
 
 
-def test_remote_password_passed_only_on_stdin(monkeypatch: pytest.MonkeyPatch) -> None:
+@pytest.mark.parametrize("database", [None, "existing_backlog"])
+def test_remote_password_passed_only_on_stdin(
+    monkeypatch: pytest.MonkeyPatch, database: str | None
+) -> None:
     """Escape SQL literals and suppress credential-bearing client output."""
     password = "synthetic'\\password"
     monkeypatch.setenv("BEADS_REMOTE_PASSWORD", password)
+    if database is None:
+        monkeypatch.delenv("GH_BEADS_DATABASE", raising=False)
+    else:
+        monkeypatch.setenv("GH_BEADS_DATABASE", database)
 
     def sql_client(args: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
         """Inspect process boundaries without opening a database connection."""
         assert all(password not in arg for arg in args)
         assert "synthetic''\\\\password" in kwargs["input"]
-        assert "GRANT ALL PRIVILEGES ON beads_hub.*" in kwargs["input"]
+        assert f"GRANT ALL PRIVILEGES ON `{database or 'gh_beads'}`.*" in kwargs["input"]
         assert kwargs["env"]["DOLT_CLI_PASSWORD"] == ""
         assert kwargs["capture_output"] is True
         return subprocess.CompletedProcess(args, returncode=0)
 
     monkeypatch.setattr(subprocess, "run", sql_client)
     configure_remote_access()
+
+
+@pytest.mark.parametrize("database", ["", "other-db", "db`.*; DROP USER beads; --"])
+def test_invalid_remote_database_fails(monkeypatch: pytest.MonkeyPatch, database: str) -> None:
+    """Reject invalid SQL identifiers before starting a credential-bearing SQL client."""
+    monkeypatch.setenv("BEADS_REMOTE_PASSWORD", "synthetic-password")
+    monkeypatch.setenv("GH_BEADS_DATABASE", database)
+    monkeypatch.setattr(subprocess, "run", lambda *args, **kwargs: pytest.fail("SQL invoked"))
+    with pytest.raises(ValueError, match="GH_BEADS_DATABASE"):
+        configure_remote_access()
 
 
 def test_missing_remote_password_fails(monkeypatch: pytest.MonkeyPatch) -> None:

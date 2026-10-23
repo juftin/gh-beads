@@ -13,8 +13,8 @@ from typing import Any
 import pytest
 from fixtures import FixtureGitHub, item, repository
 
-from beads_hub import sync
-from beads_hub.state import SyncState
+from gh_beads import sync
+from gh_beads.state import SyncState
 
 
 class MemoryBeads(sync.Beads):

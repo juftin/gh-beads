@@ -173,7 +173,7 @@ class GitHub:
             if not token:
                 raise ValueError("Inject GH_TOKEN to sync GitHub; gh CLI login is not used")
             client = Client(
-                token, user_agent="beads-hub", timeout=30, http_cache=False, auto_retry=False
+                token, user_agent="gh-beads", timeout=30, http_cache=False, auto_retry=False
             )
         self.client = client
         self.workers = workers

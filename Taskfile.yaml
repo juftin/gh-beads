@@ -1,7 +1,7 @@
 version: '3'
 
 vars:
-  IMAGE: beads-hub:test
+  IMAGE: gh-beads:test
 
 env:
   IMAGE: '{{.IMAGE}}'
@@ -36,6 +36,13 @@ tasks:
   smoke-local:
     desc: Exercise native embedded Dolt, concurrent polling, and stdio in a disposable repository
     cmds: [uv run --locked python tests/smoke_embedded.py]
+  smoke-restore:
+    desc: Back up a stopped embedded workspace and validate an independent disposable restore
+    cmds: [uv run --locked python tests/smoke_restore.py]
+  snapshot:
+    desc: Show stored portfolio coverage, bounded queues, and saved triage in Compose
+    cmds:
+      - docker compose exec -T github-reconciler gh-beads-snapshot {{.CLI_ARGS}}
   run:
     desc: Run a command in the project environment
     cmds: ['uv run --locked {{.CLI_ARGS}}']
@@ -64,8 +71,8 @@ tasks:
   sync-now:
     desc: Run one reconciliation in Compose using the shared sync lock
     cmds:
-      - docker compose exec -T github-reconciler beads-hub-sync {{.CLI_ARGS}}
+      - docker compose exec -T github-reconciler gh-beads-sync {{.CLI_ARGS}}
   sync-status:
     desc: Show per-repository sync checkpoints, successes, failures, and rate cooldown
     cmds:
-      - docker compose exec -T github-reconciler beads-hub-sync --status
+      - docker compose exec -T github-reconciler gh-beads-sync --status

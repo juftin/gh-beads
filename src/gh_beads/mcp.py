@@ -7,8 +7,37 @@ from typing import Any
 
 from beads_mcp.server import mcp as mcp
 
-from beads_hub.runtime import wait_for_hub
-from beads_hub.sync import run_sync
+from gh_beads.runtime import wait_for_hub
+from gh_beads.snapshot import portfolio_snapshot
+from gh_beads.sync import run_sync
+from gh_beads.triage import record_triage
+
+
+@mcp.tool(name="portfolio_snapshot")
+def portfolio_snapshot_tool(
+    repositories: list[str] | None = None,
+    limit: int = 20,
+) -> dict[str, Any]:
+    """Read stored repository coverage, readiness, attention signals, and saved triage decisions."""
+    return portfolio_snapshot(repositories, limit)
+
+
+@mcp.tool(name="record_triage")
+def record_triage_tool(
+    bead_id: str,
+    rationale: str,
+    next_action: str,
+    reviewer: str | None = None,
+    expected_fingerprint: str | None = None,
+) -> dict[str, Any]:
+    """Remember a local review; supply reviewer or configure BEADS_ACTOR. No GitHub writes."""
+    return record_triage(
+        bead_id,
+        rationale,
+        next_action,
+        reviewer=reviewer,
+        expected_fingerprint=expected_fingerprint,
+    )
 
 
 @mcp.tool(

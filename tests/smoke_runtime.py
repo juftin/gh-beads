@@ -18,10 +18,12 @@ from fixtures import FixtureGitHub, item, repository
 from smoke_stdio import check_stdio
 from websockets.asyncio.client import connect
 
-from beads_hub.github import node_metadata
-from beads_hub.runtime import wait_for_hub
-from beads_hub.state import SyncState
-from beads_hub.sync import Beads, reconcile
+from gh_beads.github import node_metadata
+from gh_beads.runtime import wait_for_hub
+from gh_beads.snapshot import portfolio_snapshot
+from gh_beads.state import SyncState
+from gh_beads.sync import Beads, reconcile
+from gh_beads.triage import record_triage
 
 
 def main() -> None:
@@ -114,6 +116,12 @@ def main() -> None:
     assert len(beads.items()) == 3
     assert all("example/renamed#" in row["external_ref"] for row in beads.items())
     assert next(row for row in beads.items() if row["id"] == epic_id)["title"] == "example/renamed"
+    record_triage(pr_id, "Synthetic source review", "Prepare next action", reviewer="smoke-agent")
+    beads.call("comments", "add", pr_id, "Synthetic handoff survives volume restoration")
+    portfolio = portfolio_snapshot()
+    assert portfolio["coverage"]["status"] == "complete"
+    assert portfolio["totals"]["items"] == 2
+    assert portfolio["queues"]["in_progress"]["items"][0]["triage"]["review_count"] == 1
     asyncio.run(check_http())
     asyncio.run(check_stdio())
     print(

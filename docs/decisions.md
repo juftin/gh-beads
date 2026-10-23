@@ -2,7 +2,7 @@
 
 ## Start a separate Beads implementation
 
-The standalone [beads-hub repository](https://github.com/jufty-bot/beads-hub) contains the Beads-backed shared backlog and its clean implementation history. The earlier SQLite application and its history remain in [gh-maintainer](https://github.com/jufty-bot/gh-maintainer). No earlier application files or migration contracts carry into this design. This lets the new workflow be evaluated independently without claiming compatibility with earlier state.
+The standalone [gh-beads repository](https://github.com/juftin/gh-beads) contains the Beads-backed shared backlog and its clean implementation history. The earlier SQLite application and its history remain in [gh-maintainer](https://github.com/jufty-bot/gh-maintainer). No earlier application files or migration contracts carry into this design. This lets the new workflow be evaluated independently without claiming compatibility with earlier state.
 
 ## Use upstream interfaces and pin the tested releases
 
@@ -26,7 +26,7 @@ The client disables persistent HTTP caching and automatic SDK retries. Failed re
 
 ## Install Python as a uv package
 
-Application modules live under `src/beads_hub`, using the [uv build backend](https://docs.astral.sh/uv/concepts/build-backend/) and its standard source layout. Console entrypoints replace executable Python files copied into `/usr/local/bin`. Development uses a locked editable install; Docker uses a locked non-editable install with runtime dependencies only, following [uv's container guidance](https://docs.astral.sh/uv/guides/integration/docker/). Tests and runtime services import the same package without source-path overrides. Shell helpers remain in `scripts/`, and `task package` builds distributions independently of the Docker build. Source identities, polling state, and Beads storage contracts do not change.
+Application modules live under `src/gh_beads`, using the [uv build backend](https://docs.astral.sh/uv/concepts/build-backend/) and its standard source layout. Console entrypoints replace executable Python files copied into `/usr/local/bin`. Development uses a locked editable install; Docker uses a locked non-editable install with runtime dependencies only, following [uv's container guidance](https://docs.astral.sh/uv/guides/integration/docker/). Tests and runtime services import the same package without source-path overrides. Shell helpers remain in `scripts/`, and `task package` builds distributions independently of the Docker build. Source identities, polling state, and Beads storage contracts do not change.
 
 ## Keep a small incremental poller
 

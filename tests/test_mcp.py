@@ -11,8 +11,8 @@ import pytest
 from fastmcp import Client
 from fastmcp.client.transports import StdioTransport
 
-from beads_hub import mcp as server
-from beads_hub.mcp import mcp
+from gh_beads import mcp as server
+from gh_beads.mcp import mcp
 
 
 def test_official_server_and_trigger(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -40,6 +40,8 @@ def test_official_server_and_trigger(tmp_path: Path, monkeypatch: pytest.MonkeyP
                 "context",
                 "admin",
                 "trigger_github_sync",
+                "portfolio_snapshot",
+                "record_triage",
             } <= tools.keys()
             assert tools["show"].inputSchema
             resources = await client.list_resources()
@@ -76,6 +78,51 @@ def test_selected_repository_trigger(monkeypatch: pytest.MonkeyPatch) -> None:
     assert calls == [{"repositories": ["a/one", "b/two"]}, {"repositories": None}]
 
 
+def test_portfolio_and_review_tools(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Expose only serializable public arguments and preserve source-review guards through MCP."""
+    calls: list[dict[str, Any]] = []
+
+    def snapshot(repositories: list[str] | None, limit: int) -> dict[str, Any]:
+        calls.append({"repositories": repositories, "limit": limit})
+        return {"coverage": {"status": "partial"}}
+
+    def review(*args: Any, **kwargs: Any) -> dict[str, Any]:
+        calls.append({"args": args, **kwargs})
+        return {"review_count": 1}
+
+    monkeypatch.setattr(server, "portfolio_snapshot", snapshot)
+    monkeypatch.setattr(server, "record_triage", review)
+
+    async def inspect() -> None:
+        async with Client(mcp) as client:
+            tools = {tool.name: tool for tool in await client.list_tools()}
+            assert set(tools["portfolio_snapshot"].inputSchema["properties"]) == {
+                "repositories",
+                "limit",
+            }
+            result = await client.call_tool(
+                "portfolio_snapshot", {"repositories": ["a/one"], "limit": 3}
+            )
+            assert result.data["coverage"]["status"] == "partial"
+            result = await client.call_tool(
+                "record_triage",
+                {
+                    "bead_id": "hub-1",
+                    "rationale": "Reason",
+                    "next_action": "Act",
+                    "reviewer": "agent",
+                    "expected_fingerprint": "abc",
+                },
+            )
+            assert result.data["review_count"] == 1
+
+    asyncio.run(inspect())
+    assert calls == [
+        {"repositories": ["a/one"], "limit": 3},
+        {"args": ("hub-1", "Reason", "Act"), "reviewer": "agent", "expected_fingerprint": "abc"},
+    ]
+
+
 @pytest.mark.parametrize("transport", ["stdio", "streamable-http", "sse"])
 def test_transport_settings(monkeypatch: pytest.MonkeyPatch, transport: str) -> None:
     """Stdio receives no HTTP-only options; network transports retain their configured bind."""
@@ -110,7 +157,7 @@ def test_stdio_client_process(tmp_path: Path, explicit: bool) -> None:
     if explicit:
         env.update(BEADS_WORKING_DIR=str(tmp_path), BEADS_DIR=str(beads_dir), MCP_TRANSPORT="stdio")
     transport = StdioTransport(
-        command="beads-hub-mcp",
+        command="gh-beads-mcp",
         args=[],
         cwd=str(tmp_path),
         env=env,

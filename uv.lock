@@ -151,7 +151,7 @@ wheels = [
 ]
 
 [[package]]
-name = "beads-hub"
+name = "gh-beads"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

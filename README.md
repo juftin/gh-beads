@@ -1,4 +1,4 @@
-# beads-hub
+# gh-beads
 
 A shared [Beads](https://github.com/gastownhall/beads) backlog for GitHub issues and pull requests across repositories. Bring open work into one place, group it by repository, and use Beads labels, priorities, dependencies, and claims to decide what to do next.
 
@@ -57,9 +57,9 @@ flowchart LR
 | `beads-mcp` | Serve official MCP tools/resources and `trigger_github_sync` | Healthy hub |
 | `github-reconciler` | Run the continuous GitHub polling loop | Healthy hub |
 
-The reconciler uses GitHubKit for authenticated REST/GraphQL requests and pagination. Beads mutations go through its supported `bd` CLI. The hub retains the official beads-mcp server instance and adds a sync trigger rather than duplicating its tool definitions.
+The reconciler uses GitHubKit for authenticated REST/GraphQL requests and pagination. Beads mutations go through its supported `bd` CLI. The hub retains the official beads-mcp server instance and adds a sync trigger, portfolio snapshot, and local review recording alongside its tools.
 
-UI, MCP, and sync share the Dolt container's network namespace so internal SQL clients use its loopback interface. Published ports belong to the `dolt` service and bind to the Docker host's `127.0.0.1`. External SQL clients use the password-protected `beads` account, whose grants are limited to the `beads_hub` database.
+UI, MCP, and sync share the Dolt container's network namespace so internal SQL clients use its loopback interface. Published ports belong to the `dolt` service and bind to the Docker host's `127.0.0.1`. External SQL clients use the password-protected `beads` account, whose grants are limited to the `gh_beads` database.
 
 The named `data` volume mounts at `/var/lib/beads` in each service:
 
@@ -155,20 +155,20 @@ Bootstrap excludes old closed history. After bootstrap, all-state deltas can dis
 The default local setup needs Python 3.11+, uv, and native Beads `bd` 1.3.1 with embedded Dolt support. Its database lives inside the repository. The embedded engine ships with `bd`; a separate Dolt executable or SQL server is not required.
 
 ```sh
-git clone https://github.com/jufty-bot/beads-hub.git
-cd beads-hub
+git clone https://github.com/juftin/gh-beads.git
+cd gh-beads
 uv sync --locked
 bd init --prefix hub --non-interactive --skip-agents --skip-hooks
 
 # Inject a GitHub read credential securely before starting the poller.
 : "${GH_TOKEN:?Inject a GitHub read credential}"
 export GH_SYNC_QUERY='user:@me'
-uv run --locked beads-hub-sync --loop --interval 120
+uv run --locked gh-beads-sync --loop --interval 120
 ```
 
 Use a fresh Beads workspace for initialization. The credential needs read access to selected repositories and their issues, PRs, checks, and commit statuses, including private/organization access where needed. Sync authenticates directly through GitHubKit; GitHub CLI login is not used. Keep credentials out of committed files and command history.
 
-From another terminal in the initialized repository, inspect progress with `uv run --locked beads-hub-sync --status`. Configure an MCP client to launch `uv run --locked beads-hub-mcp`, which defaults to stdio. The [local guide](docs/local.md) includes a copyable client configuration and instructions for keeping code and data in separate repositories.
+From another terminal in the initialized repository, inspect progress with `uv run --locked gh-beads-sync --status`. Configure an MCP client to launch `uv run --locked gh-beads-mcp`, which defaults to stdio. The [local guide](docs/local.md) includes a copyable client configuration and instructions for keeping code and data in separate repositories.
 
 ## Local Dolt and stdio
 
@@ -177,8 +177,8 @@ Native `bd` opens `.beads/embeddeddolt/` directly for each operation. The Python
 | Component | Lifetime |
 | --- | --- |
 | `.beads/embeddeddolt/` | Persistent local SQL database, opened directly by `bd` |
-| `uv run --locked beads-hub-sync --loop --interval 120` | One background poller while automatic GitHub updates are wanted |
-| `uv run --locked beads-hub-mcp` | Stdio session started and stopped by each MCP client |
+| `uv run --locked gh-beads-sync --loop --interval 120` | One background poller while automatic GitHub updates are wanted |
+| `uv run --locked gh-beads-mcp` | Stdio session started and stopped by each MCP client |
 
 The database stays on disk when both processes exit. Closing a client leaves polling independent, and reopening a client requires no database initialization. The stdio wrapper retains the official Beads tools and the hub's sync trigger. See [local setup and client configuration](docs/local.md#3-connect-a-stdio-mcp-client) for details. Existing SQL-server workspaces retain their configured backend; this default change does not migrate their data.
 
@@ -206,19 +206,20 @@ Check the initial import with `task sync-status` and `docker compose logs --tail
 
 ## Configuration
 
-Inject configuration into the environment used by Compose. Its default project is `beads-hub`, with persistent data in `beads-hub_data`.
+Inject configuration into the environment used by Compose. Its default project is `gh-beads`, with persistent data in `gh-beads_data`.
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `GH_TOKEN` | Empty | GitHub read credential; required for sync, optional for offline UI/MCP use |
 | `BEADS_REMOTE_PASSWORD` | Required in Compose | Nonempty password for the database-scoped remote SQL user `beads` |
+| `GH_BEADS_DATABASE` | `gh_beads` | Compose SQL database name; use the existing name when upgrading a stored workspace |
 | `GH_SYNC_QUERY` | `user:@me` | Semicolon-separated repository inventory scopes |
 | `GH_SYNC_INTERVAL` | `120` | Positive pause in seconds after each automatic pass |
 | `GH_SYNC_WORKERS` | `1` | Independent GitHub node-read workers, from 1 to 4 |
 | `BEADS_UI_PORT` / `BEADS_MCP_PORT` / `BEADS_SQL_PORT` | `3000` / `8080` / `3307` | Host ports; container ports remain fixed |
 | `MCP_TRANSPORT` | `stdio` locally; `streamable-http` in Compose | MCP client transport; use `sse` for legacy `/sse` |
 | `BEADS_WORKING_DIR` | Current directory locally; `/var/lib/beads` in Docker | Initialized repository holding the database, lock, and progress |
-| `IMAGE` | `beads-hub:test` | Shared image tag; with Task, select it using `IMAGE=...` as a task variable |
+| `IMAGE` | `gh-beads:test` | Shared image tag; with Task, select it using `IMAGE=...` as a task variable |
 
 Supported scopes are inventory selectors, rather than arbitrary search queries:
 
@@ -231,15 +232,21 @@ Supported scopes are inventory selectors, rather than arbitrary search queries:
 
 For example, set `GH_SYNC_QUERY='user:@me;org:example-team;repo:another-owner/project'` for overlapping scopes; duplicates are imported once. Both issues and PRs are always included. Search qualifiers such as `label:` or `is:open` are rejected.
 
-For a selected run, use `uv run --locked beads-hub-sync --repo example/api --repo example/web`, or `task sync-now -- --repo example/api --full` in Compose. Repeated `--repo` flags replace configured scopes for that command and also work with `--loop`. MCP clients can call `trigger_github_sync` with `{"repositories": ["example/api", "example/web"]}`; omitting the list uses configured scopes. Unselected imports and checkpoints are retained. To persist selection for the periodic worker, configure `GH_SYNC_QUERY` with explicit `repo:` scopes. See [repository selection](docs/usage.md#select-repositories).
+For a selected run, use `uv run --locked gh-beads-sync --repo example/api --repo example/web`, or `task sync-now -- --repo example/api --full` in Compose. Repeated `--repo` flags replace configured scopes for that command and also work with `--loop`. MCP clients can call `trigger_github_sync` with `{"repositories": ["example/api", "example/web"]}`; omitting the list uses configured scopes. Unselected imports and checkpoints are retained. To persist selection for the periodic worker, configure `GH_SYNC_QUERY` with explicit `repo:` scopes. See [repository selection](docs/usage.md#select-repositories).
 
 The SQL password must remain available when loading Compose configuration for operational tasks. `task validate` uses the quiet Compose check so credentials are not printed. See [deployment guidance](docs/usage.md#deploy-with-docker-compose) for custom image tags, password rotation, and port configuration.
 
 ## Triage and agent access
 
+### Portfolio snapshot and saved reviews
+
+Start with `uv run --locked gh-beads-snapshot --json` locally or `task snapshot` in Compose. It returns repository links, coverage/ages/errors, source and local totals, and bounded ready, blocked, in-progress, attention, unreviewed, and changed-since-review queues. Repeat `--repo OWNER/REPO` to select repositories; `--limit 50` expands each queue. Inspect `total` and `truncated`; stored success does not establish live freshness.
+
+Save a decision with `uv run --locked gh-beads-triage BEAD_ID --reviewer agent --rationale 'Reason' --next-action 'Next step'`. Reviews retain history under local `metadata.triage`, survive sync, and flag changed source evidence. Add `--expected-fingerprint` from the snapshot to guard against reviewing newer imported evidence. See [snapshot and review usage](docs/usage.md#portfolio-snapshot-and-saved-decisions).
+
 ### Beads CLI
 
-For shell-capable agents, use the matching `bd` CLI (currently `1.3.1`) from the initialized local repository. For centralized SQL access, create the [Compose pointer workspace](AGENTS.md#compose-sql-clients). Then filter and triage through Beads:
+For shell-capable agents, use the matching `bd` CLI (currently `1.3.1`) from the initialized local repository. For centralized SQL access, create the [Compose pointer workspace](docs/usage.md#compose-sql-clients). Then filter and triage through Beads:
 
 ```sh
 bd ready --label 'repo:example/orbit' --json
@@ -270,11 +277,11 @@ For the local default, use the [stdio client configuration](docs/local.md#3-conn
 }
 ```
 
-The official server provides tools such as `ready`, `list`, `show`, `create`, `claim`, `update`, `close`, `reopen`, `dep`, and comments, plus `beads://quickstart`. Use its tool discovery for exact schemas. The added `trigger_github_sync` tool runs a synchronous reconciliation under the same lock as the worker and returns `complete`, `partial`, or `busy`. See [agent connections](AGENTS.md#mcp-agents) for stdio and context-routing details.
+The official server provides tools such as `ready`, `list`, `show`, `create`, `claim`, `update`, `close`, `reopen`, `dep`, and comments, plus `beads://quickstart`. Use its tool discovery for exact schemas. The added `portfolio_snapshot` and `record_triage` tools read stored queues and save local decisions. The `trigger_github_sync` tool runs a synchronous reconciliation under the same lock as the worker and returns `complete`, `partial`, or `busy`. See the [agent workflow](AGENTS.md#mcp-agents) for triage and links to connection setup.
 
 ## Operations and troubleshooting
 
-For the local workspace, use `uv run --locked beads-hub-sync --status` and `uv run --locked beads-hub-sync --full`. The Task commands below operate the Compose deployment:
+For the local workspace, use `uv run --locked gh-beads-sync --status` and `uv run --locked gh-beads-sync --full`. The Task commands below operate the Compose deployment:
 
 ```sh
 task sync-now
@@ -303,17 +310,19 @@ Keep one instance of each service. Bring the full stack up together when replaci
 
 ## Python package and development
 
-Application code lives in `src/beads_hub` and uses the `uv_build` backend. Development installs are editable; Docker installs the package non-editable with locked runtime dependencies.
+Application code lives in `src/gh_beads` and uses the `uv_build` backend. Development installs are editable; Docker installs the package non-editable with locked runtime dependencies.
 
 ```text
-src/beads_hub/
+src/gh_beads/
 ├── __init__.py
 ├── github.py       # GitHubKit requests, pagination, source snapshots, bounded reads
 ├── description.py  # Linked Markdown tables, source escaping, attention summaries
 ├── sync.py         # Beads CLI adapter, ownership rules, reconciliation, polling CLI
-├── state.py        # Incremental cursors, repair selection, atomic progress persistence
+├── state.py        # Incremental cursors, discovered inventories, atomic progress
+├── snapshot.py     # Stored coverage, rollups, and bounded portfolio queues
+├── triage.py       # Local review history and source-change fingerprints
 ├── runtime.py      # Startup readiness and database-scoped SQL account setup
-└── mcp.py          # Official MCP instance, transport startup, synchronous sync trigger
+└── mcp.py          # Official MCP instance, transports, sync/snapshot/review tools
 scripts/            # Shell startup and disposable smoke helpers
 tests/              # Offline source/CLI/reconciliation tests and runtime smoke checks
 compose.yaml        # Four-service deployment and persistent volume
@@ -325,9 +334,11 @@ uv.lock             # Locked Python dependency resolution
 
 | Installed command | Purpose |
 | --- | --- |
-| `beads-hub-sync` | One-shot/periodic reconciliation, `--full` repair, and `--status` |
-| `beads-hub-mcp` | Start the official MCP stdio/HTTP/SSE server after hub readiness |
-| `beads-hub-runtime` | Wait for SQL/hub readiness or provision the remote SQL account |
+| `gh-beads-sync` | One-shot/periodic reconciliation, `--full` repair, and `--status` |
+| `gh-beads-mcp` | Start the official MCP stdio/HTTP/SSE server after hub readiness |
+| `gh-beads-snapshot` | Read stored portfolio counts, bounded queues, and review changes |
+| `gh-beads-triage` | Append a local review with rationale, next action, and source fingerprint |
+| `gh-beads-runtime` | Wait for SQL/hub readiness or provision the remote SQL account |
 
 Use Task for the same flags and environment as the project workflows:
 
@@ -339,19 +350,20 @@ task check      # Strict Python types
 task test       # Token-free behavior tests
 task package    # uv source distribution and wheel in dist/
 task smoke-local  # Native bd: disposable embedded database and concurrent stdio/polling
-task smoke        # Build and exercise a disposable Compose stack
+task smoke-restore # Native bd: offline backup and independent restore verification
+task smoke        # Disposable Compose stack, restart, and independent volume restore
 
-task run -- beads-hub-sync --help
-uv run --locked beads-hub-sync --status
+task run -- gh-beads-sync --help
+uv run --locked gh-beads-sync --status
 ```
 
 Running sync or MCP locally requires an initialized hub and the matching `bd` CLI. `--status` reads progress without contacting GitHub. Tests import the installed package without source-path overrides. Add dependencies with `uv add`, commit `uv.lock`, and use `task lock` when intentionally refreshing resolution. `task build` builds the Docker image; `task package` builds Python distributions.
 
-The smoke workflow uses synthetic GitHub records with real Beads, Dolt, UI, and MCP processes. It creates an isolated Compose project and volume, uses temporary localhost ports, verifies restart persistence, and removes its test resources on exit. Do not run `tests/smoke_runtime.py` against a real backlog: it deliberately writes synthetic work items.
+The smoke workflow uses synthetic GitHub records with real Beads, Dolt, UI, and MCP processes. It creates an isolated Compose project and volume, uses temporary localhost ports, verifies restart persistence and an independent offline volume restore, and removes its test resources on exit. The [backup runbook](docs/usage.md#backup-and-restore) documents the corresponding operator procedure. Do not run `tests/smoke_runtime.py` against a real backlog: it deliberately writes synthetic work items.
 
 ## Current scope and validation
 
-The current implementation has 129 passing offline tests, source/wheel build validation, native ARM64 macOS and AMD64 Linux embedded Dolt/concurrent polling/stdio/persistence validation, and linked-table Markdown/sanitization checks. A prior ARM64 Compose smoke pass covers installed commands, Beads lifecycle/graph behavior, UI WebSocket delivery, official MCP tools/resources over HTTP and stdio, authenticated remote SQL, and restart persistence. The updated repository epic and linked-description assertions await a Compose rerun because Docker is unavailable in the current validation environment. GitHub HTTP tests use synthetic responses. A credentialed multi-repository pilot, AMD64 image build, full browser interaction suite, and backup/restore exercise remain unverified.
+The current implementation has 146 passing offline tests, source/wheel build validation, native ARM64 macOS and AMD64 Linux embedded Dolt/concurrent polling/stdio/persistence validation, and linked-table Markdown/sanitization checks. A prior ARM64 Compose smoke pass covers installed commands, Beads lifecycle/graph behavior, UI WebSocket delivery, official MCP tools/resources over HTTP and stdio, authenticated remote SQL, and restart persistence. The latest embedded snapshot/review MCP checks and independent backup/restore validation pass on AMD64 Linux, including installed CLIs and zero-write restored sync replay. Updated Docker assertions (epics, linked descriptions, reviews, and independent volume restore) await execution because Docker is unavailable here. GitHub HTTP tests use synthetic responses. A credentialed multi-repository pilot, AMD64 image build, full browser interaction suite, and SQL/Compose restore execution remain unverified.
 
 Current boundaries include polling rather than webhooks, one shared backlog rather than tenant isolation or HA, selected source snapshots rather than complete conversations/diffs/history, and human/agent categorization rather than automatic classification. There is no GitHub write-back, automatic freshness alerting, or migration from the earlier SQLite application.
 

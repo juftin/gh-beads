@@ -1,7 +1,7 @@
-name: beads-hub
+name: gh-beads
 
 x-runtime: &runtime
-  image: ${IMAGE:-beads-hub:test}
+  image: ${IMAGE:-gh-beads:test}
   restart: unless-stopped
   stop_grace_period: 30s
   volumes:
@@ -46,6 +46,7 @@ services:
         condition: service_healthy
     environment:
       BEADS_REMOTE_PASSWORD: ${BEADS_REMOTE_PASSWORD:?Inject the remote SQL password at runtime}
+      GH_BEADS_DATABASE: ${GH_BEADS_DATABASE:-gh_beads}
     healthcheck:
       test: [CMD, curl, -fsS, http://127.0.0.1:3000/healthz]
       interval: 5s
@@ -56,7 +57,7 @@ services:
   beads-mcp:
     <<: *runtime
     network_mode: service:dolt
-    command: [beads-hub-mcp]
+    command: [gh-beads-mcp]
     depends_on:
       hub:
         condition: service_healthy
@@ -79,7 +80,7 @@ services:
   github-reconciler:
     <<: *runtime
     network_mode: service:dolt
-    command: [beads-hub-sync, --loop, --interval, '${GH_SYNC_INTERVAL:-120}']
+    command: [gh-beads-sync, --loop, --interval, '${GH_SYNC_INTERVAL:-120}']
     depends_on:
       hub:
         condition: service_healthy

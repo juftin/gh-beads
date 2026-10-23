@@ -1,5 +1,5 @@
 [project]
-name = "beads-hub"
+name = "gh-beads"
 version = "0.1.0"
 description = "A shared Beads backlog for GitHub issues and pull requests"
 readme = "README.md"
@@ -9,10 +9,16 @@ dependencies = [
     "githubkit>=0.16.1,<0.17",
 ]
 
+[project.urls]
+Repository = "https://github.com/juftin/gh-beads"
+Issues = "https://github.com/juftin/gh-beads/issues"
+
 [project.scripts]
-beads-hub-sync = "beads_hub.sync:main"
-beads-hub-mcp = "beads_hub.mcp:main"
-beads-hub-runtime = "beads_hub.runtime:main"
+gh-beads-sync = "gh_beads.sync:main"
+gh-beads-mcp = "gh_beads.mcp:main"
+gh-beads-runtime = "gh_beads.runtime:main"
+gh-beads-snapshot = "gh_beads.snapshot:main"
+gh-beads-triage = "gh_beads.triage:main"
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13"]

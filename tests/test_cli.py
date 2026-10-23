@@ -10,13 +10,13 @@ from pathlib import Path
 
 import pytest
 
-from beads_hub import sync
+from gh_beads import sync
 
 
 def test_sync_status_outside_checkout(tmp_path: Path) -> None:
     """Read polling progress through the installed command without GitHub or source-path setup."""
     result = subprocess.run(
-        ["beads-hub-sync", "--status"],
+        ["gh-beads-sync", "--status"],
         cwd=tmp_path,
         env={**os.environ, "BEADS_WORKING_DIR": str(tmp_path), "GH_TOKEN": "", "PYTHONPATH": ""},
         check=True,
@@ -37,7 +37,7 @@ def test_current_repository_is_default_workspace(tmp_path: Path) -> None:
     env = {key: value for key, value in os.environ.items() if key != "BEADS_WORKING_DIR"}
     env.update(GH_TOKEN="", PYTHONPATH="")
     status = subprocess.run(
-        ["beads-hub-sync", "--status"],
+        ["gh-beads-sync", "--status"],
         cwd=tmp_path,
         env=env,
         check=True,
@@ -47,7 +47,7 @@ def test_current_repository_is_default_workspace(tmp_path: Path) -> None:
     )
     assert json.loads(status.stdout) == state
     sync = subprocess.run(
-        ["beads-hub-sync"],
+        ["gh-beads-sync"],
         cwd=tmp_path,
         env=env,
         check=False,
@@ -60,7 +60,9 @@ def test_current_repository_is_default_workspace(tmp_path: Path) -> None:
     assert (tmp_path / ".github-sync.lock").exists()
 
 
-@pytest.mark.parametrize("command", ["beads-hub-sync", "beads-hub-runtime"])
+@pytest.mark.parametrize(
+    "command", ["gh-beads-sync", "gh-beads-runtime", "gh-beads-snapshot", "gh-beads-triage"]
+)
 def test_command_help_outside_checkout(tmp_path: Path, command: str) -> None:
     """Resolve console entrypoints without starting services or requiring a hub workspace."""
     result = subprocess.run(
@@ -80,7 +82,7 @@ def test_selected_repository_cli(
 ) -> None:
     """Repeated repository flags and full repairs reach the sync runner together."""
     monkeypatch.setattr(
-        "sys.argv", ["beads-hub-sync", "--repo", "a/one", "--repo", "b/two", "--full"]
+        "sys.argv", ["gh-beads-sync", "--repo", "a/one", "--repo", "b/two", "--full"]
     )
     calls: list[dict[str, object]] = []
 

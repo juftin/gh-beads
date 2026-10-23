@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import re
 import socket
 import subprocess
 import time
@@ -15,11 +16,14 @@ def configure_remote_access() -> None:
     password = os.environ.get("BEADS_REMOTE_PASSWORD", "")
     if not password or "\x00" in password:
         raise ValueError("Inject a nonempty BEADS_REMOTE_PASSWORD for the remote SQL account")
+    database = os.environ.get("GH_BEADS_DATABASE", "gh_beads")
+    if not re.fullmatch(r"[A-Za-z0-9_]+", database):
+        raise ValueError("GH_BEADS_DATABASE must contain only letters, digits, and underscores")
     escaped = password.replace("\\", "\\\\").replace("'", "''")
     sql = (
         "CREATE USER IF NOT EXISTS 'beads'@'%';\n"
         f"ALTER USER 'beads'@'%' IDENTIFIED BY '{escaped}';\n"
-        "GRANT ALL PRIVILEGES ON beads_hub.* TO 'beads'@'%';\n"
+        f"GRANT ALL PRIVILEGES ON `{database}`.* TO 'beads'@'%';\n"
     )
     result = subprocess.run(
         [

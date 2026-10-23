@@ -12,7 +12,7 @@ from fastmcp.client.transports import StdioTransport
 async def check_stdio() -> None:
     """Discover official capabilities and read real Beads data over a spawned stdio session."""
     transport = StdioTransport(
-        command="beads-hub-mcp",
+        command="gh-beads-mcp",
         args=[],
         env={**os.environ, "MCP_TRANSPORT": "stdio", "GH_TOKEN": ""},
     )

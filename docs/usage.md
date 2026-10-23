@@ -2,22 +2,22 @@
 
 ## Development
 
-Python 3.11+, uv, Task, and Docker with the Compose plugin are required for the full validation workflow. `task install` runs `uv sync --locked`, installing the `src/beads_hub` package editable and its development dependencies. `task fix`, `task lint`, `task check`, and `task test` cover formatting, lint, shell syntax, types, and token-free behavior tests. `task run -- <command>` runs inside the locked environment. `task package` uses `uv build --no-sources` to build the source distribution and wheel in `dist/`; `task build` still builds the Docker image.
+Python 3.11+, uv, Task, and Docker with the Compose plugin are required for the full validation workflow. `task install` runs `uv sync --locked`, installing the `src/gh_beads` package editable and its development dependencies. `task fix`, `task lint`, `task check`, and `task test` cover formatting, lint, shell syntax, types, and token-free behavior tests. `task run -- <command>` runs inside the locked environment. `task package` uses `uv build --no-sources` to build the source distribution and wheel in `dist/`; `task build` still builds the Docker image.
 
-The package installs three commands: `beads-hub-sync` for one-shot/periodic sync and progress inspection, `beads-hub-mcp` for the official MCP stdio/HTTP/SSE server, and `beads-hub-runtime` for readiness and SQL account setup. From the checkout, run them through uv or the Task wrapper:
+The package installs five commands: `gh-beads-sync` for one-shot/periodic sync and progress inspection, `gh-beads-mcp` for the official MCP stdio/HTTP/SSE server, `gh-beads-runtime` for readiness and SQL account setup, `gh-beads-snapshot` for portfolio coverage and queues, and `gh-beads-triage` for saved decisions. From the checkout, run them through uv or the Task wrapper:
 
 ```sh
-task run -- beads-hub-sync --help
-uv run --locked beads-hub-sync --status
+task run -- gh-beads-sync --help
+uv run --locked gh-beads-sync --status
 ```
 
 These commands default to the current repository; `BEADS_WORKING_DIR` can select another initialized workspace. Local sync/MCP requires the matching native `bd` CLI with embedded Dolt support. Docker sets an explicit workspace and SQL connection, installs the package non-editable with runtime dependencies only, then starts the same commands directly. No `PYTHONPATH` configuration is required.
 
-`task smoke` builds `beads-hub:test`, starts the checked-in Compose stack under a disposable project name with its own volume, and removes them on exit. It uses synthetic GitHub data with real Beads, Dolt, UI, and MCP processes. It verifies readiness, dependencies, claims, local fields, closure, reopening, renames, HTTP and stdio MCP access, a separate remote SQL pointer, and restart persistence. It requires no GitHub token and publishes temporary localhost ports instead of the normal fixed ports. Its cleanup removes only the test project and volume. Do not run `tests/smoke_runtime.py` against a real hub: it intentionally writes its synthetic backlog.
+`task smoke` builds `gh-beads:test`, starts the checked-in Compose stack under a disposable project name with its own volume, and removes its test resources on exit. It uses synthetic GitHub data with real Beads, Dolt, UI, and MCP processes. It verifies readiness, dependencies, claims, local fields, closure, reopening, renames, HTTP and stdio MCP access, a separate remote SQL pointer, and restart persistence. It requires no GitHub token and publishes temporary localhost ports instead of the normal fixed ports. Its cleanup removes only the disposable source/restore projects and their data/backup volumes. Do not run `tests/smoke_runtime.py` against a real hub: it intentionally writes its synthetic backlog.
 
 ## Local embedded deployment
 
-The [local guide](local.md) covers plain `bd init`, repository-local `.beads/embeddeddolt/` storage, uv polling, and a copyable client configuration. `beads-hub-mcp` defaults to stdio. Native `bd` opens the database directly, with no SQL listener or separate Dolt executable. All local processes share one repository workspace, sync lock, and progress file. `task smoke-local` validates embedded behavior, concurrent poller/MCP access, and persistence in a disposable repository using native `bd` and synthetic source records. Compose continues to select HTTP/SSE and its SQL server explicitly. Existing server-mode workspaces retain their configured connection and are not converted by these defaults.
+The [local guide](local.md) covers plain `bd init`, repository-local `.beads/embeddeddolt/` storage, uv polling, and a copyable client configuration. `gh-beads-mcp` defaults to stdio. Native `bd` opens the database directly, with no SQL listener or separate Dolt executable. All local processes share one repository workspace, sync lock, and progress file. `task smoke-local` validates embedded behavior, concurrent poller/MCP access, and persistence in a disposable repository using native `bd` and synthetic source records. Compose continues to select HTTP/SSE and its SQL server explicitly. Existing server-mode workspaces retain their configured connection and are not converted by these defaults.
 
 ## Select repositories
 
@@ -42,7 +42,7 @@ To sync a specific set on demand, repeat `--repo OWNER/REPO`. These names replac
 
 ```sh
 # Local workspace
-uv run --locked beads-hub-sync --repo example/api --repo example/web
+uv run --locked gh-beads-sync --repo example/api --repo example/web
 # Compose: repair only this repository
 task sync-now -- --repo example/api --full
 ```
@@ -84,6 +84,7 @@ Inject these variables through your shell or password manager before starting:
 | Variable | Use |
 | --- | --- |
 | `BEADS_REMOTE_PASSWORD` | Required, nonempty password for the database-scoped remote SQL user `beads`; passed only to hub initialization |
+| `GH_BEADS_DATABASE` | SQL database name, default `gh_beads`; use the existing database name when upgrading |
 | `GH_TOKEN` | Read credential for selected repositories; passed only to MCP and the reconciler. Optional for offline UI/MCP use; sync reports an authentication failure when absent |
 | `GH_SYNC_QUERY` | Inventory scopes, defaults to `user:@me` |
 | `GH_SYNC_INTERVAL` | Positive pause in seconds between automatic passes, defaults to `120` |
@@ -98,7 +99,7 @@ task deploy
 
 `task deploy` builds the image locally, then runs `docker compose up -d --wait --wait-timeout 180`. The direct equivalent is `docker compose up -d --build --wait --wait-timeout 180`. Startup waits for SQL, then initializes the workspace and remote account before starting MCP and sync. All services have health checks and `restart: unless-stopped`. An unhealthy running container is reported unhealthy; the restart policy applies when its process exits.
 
-The default image is `beads-hub:test`. To choose another tag consistently across build and startup, use `task deploy IMAGE=ghcr.io/example/beads-hub:0.1.0`. A registry is optional for a local deployment; `task push IMAGE=...` publishes an image only when explicitly invoked.
+The default image is `gh-beads:test`. To choose another tag consistently across build and startup, use `task deploy IMAGE=ghcr.io/example/gh-beads:0.1.0`. A registry is optional for a local deployment; `task push IMAGE=...` publishes an image only when explicitly invoked.
 
 | Endpoint | Default host address |
 | --- | --- |
@@ -106,18 +107,87 @@ The default image is `beads-hub:test`. To choose another tag consistently across
 | Streamable HTTP MCP | `http://127.0.0.1:8080/mcp` |
 | Dolt SQL | `127.0.0.1:3307` |
 
-Compose binds all three published ports to localhost. `BEADS_UI_PORT`, `BEADS_MCP_PORT`, and `BEADS_SQL_PORT` can select different host ports while container ports remain fixed. UI, MCP, and sync share Dolt's network namespace, so their port mappings belong to the `dolt` service. A separate container on the Compose network can reach SQL as `dolt:3307`. Initialize a matching `bd` CLI with the [pointer bootstrap](../AGENTS.md).
+Compose binds all three published ports to localhost. `BEADS_UI_PORT`, `BEADS_MCP_PORT`, and `BEADS_SQL_PORT` can select different host ports while container ports remain fixed. UI, MCP, and sync share Dolt's network namespace, so their port mappings belong to the `dolt` service. A separate container on the Compose network can reach SQL as `dolt:3307`. Initialize a matching `bd` CLI with the [pointer bootstrap](#compose-sql-clients).
 
-Dolt's root account stays local to the shared container network namespace; external clients use the password-protected `beads` account restricted to `beads_hub`. To rotate its password, update the injected `BEADS_REMOTE_PASSWORD` and run `task deploy` so Compose recreates initialization with the new environment. Use a private tunnel or your own authenticated proxy for access from another host. SQL has no TLS configured, and UI/MCP have no built-in authentication. For legacy SSE, set `MCP_TRANSPORT=sse` and connect to `http://127.0.0.1:8080/sse`.
+Dolt's root account stays local to the shared container network namespace; external clients use the password-protected `beads` account restricted to `gh_beads`. To rotate its password, update the injected `BEADS_REMOTE_PASSWORD` and run `task deploy` so Compose recreates initialization with the new environment. Use a private tunnel or your own authenticated proxy for access from another host. SQL has no TLS configured, and UI/MCP have no built-in authentication. For legacy SSE, set `MCP_TRANSPORT=sse` and connect to `http://127.0.0.1:8080/sse`.
 
 ```sh
 task down       # Stops services and removes containers/network; retains the data volume
 task deploy     # Reuses the existing database
 ```
 
-The default Compose project name is `beads-hub`, with data in `beads-hub_data`. `COMPOSE_PROJECT_NAME` or `docker compose -p` selects a different stack and volume. Bring the complete stack up together when replacing the Dolt container because the other services reference its network namespace. `task down` deliberately omits `--volumes`; deleting that volume would erase the backlog.
+The default Compose project name is `gh-beads`, with data in `gh-beads_data`. `COMPOSE_PROJECT_NAME` or `docker compose -p` selects a different stack and volume. Bring the complete stack up together when replacing the Dolt container because the other services reference its network namespace. `task down` deliberately omits `--volumes`; deleting that volume would erase the backlog.
+
+### Upgrading an existing deployment after the rename
+
+The distribution is now `gh-beads`, Python imports use `gh_beads`, and installed commands use the `gh-beads-` prefix. Update scripts and MCP launch configurations, then run `task install` to refresh the locked environment. Native embedded workspaces retain their existing data and polling state; no database initialization is needed.
+
+An existing Compose deployment must keep its original project/volume and SQL database. For the previous defaults, export `COMPOSE_PROJECT_NAME=beads-hub` and `GH_BEADS_DATABASE=beads_hub` before running Compose or Task commands. Stop the old services with their original project name before replacing them, and follow the [backup procedure](#backup-and-restore) with the actual existing volume and image names. Use the existing database name for SQL pointers too. Changing the default project name alone selects a new empty volume; it does not move data. Never reinitialize the existing workspace. New deployments use `gh-beads_data` and `gh_beads`.
+
+Stored `metadata.hub`, `hub:manual-status`, existing bead ID prefixes, and `.github-sync-*` files retain their contracts so existing imports, local status overrides, and saved reviews survive the project rename.
+
+### Compose SQL clients
+
+Create a fresh, dedicated host pointer once, after `task deploy`. This pointer stores connection metadata, not another embedded copy of the backlog:
+
+```sh
+export BEADS_WORKING_DIR="$HOME/.config/beads-remote"
+export BEADS_DIR="$BEADS_WORKING_DIR/.beads"
+export BEADS_DOLT_SERVER_MODE=1
+export BEADS_DOLT_SERVER_HOST=127.0.0.1
+export BEADS_DOLT_SERVER_PORT=3307
+export BEADS_DOLT_SERVER_USER=beads
+export BEADS_DOLT_AUTO_START=0
+export BEADS_ACTOR=maintainer
+: "${BEADS_DOLT_PASSWORD:?Inject the remote SQL password securely at runtime}"
+
+mkdir -p "$BEADS_WORKING_DIR"
+(
+  cd "$BEADS_WORKING_DIR"
+  bd init --server --external --server-host "$BEADS_DOLT_SERVER_HOST" \
+    --server-port "$BEADS_DOLT_SERVER_PORT" --server-user beads --database gh_beads --prefix hub \
+    --non-interactive --skip-agents --skip-hooks
+)
+```
+
+The explicit database is `gh_beads`. The `beads` account is restricted to that database; `BEADS_DOLT_PASSWORD` must equal the value injected as `BEADS_REMOTE_PASSWORD` at deployment. If the host SQL port was changed, set the matching client port. A separate container on the Compose network can use `dolt:3307`. For another host, use a private TCP tunnel to the published localhost port. Do not reinitialize an existing unrelated workspace.
+
+Host pointers have separate filesystem locks/progress, even when addressing the same SQL database. Keep GitHub reconciliation inside Compose through `task sync-now` or its HTTP MCP trigger; do not start an independent host poller against the pointer.
+
 
 ## Operate and triage
+
+### Portfolio snapshot and saved decisions
+
+Start portfolio triage with one stored view:
+
+```sh
+# Local initialized workspace; no token or network needed
+uv run --locked gh-beads-snapshot --json
+uv run --locked gh-beads-snapshot --repo example/api --repo example/web --limit 50
+# Compose uses the poller workspace and its checkpoints
+task snapshot -- --limit 50
+```
+
+The JSON includes workspace/database identity, selection/coverage, repository links and last-success ages, source-state/local-status totals, and ready, blocked, in-progress, needs-attention, unreviewed, and changed-since-review queues. Counts cover the selected stored imports; lists default to 20 items per queue. Inspect `total`, `returned`, and `truncated`. Use `bd show ID --json` for the complete body/evidence. Needs-attention includes claimed/deferred PRs; readiness comes from Beads' dependency evaluation. Review changes include upstream closure. This is a best-effort view across separate stored reads.
+
+`coverage.status=complete` means the last matching repository discovery exists and each discovered repository has a successful checkpoint without a recorded error. Check `discovered_at`, repository `age_seconds`, errors, and `retry_at` separately for freshness. After an upgrade, sync once to populate discovery history. Missing discovery or changed configured scopes means partial coverage: broad scopes return a labeled historical fallback; explicit repo scopes filter by known names. Selected syncs retain configured-portfolio discovery. Closed history before bootstrap remains outside coverage. Host SQL pointers lack Compose's progress file; run snapshots in Compose for source coverage.
+
+Record local decisions after applying desired priority/category changes with `bd`:
+
+```sh
+uv run --locked gh-beads-triage BEAD_ID --reviewer agent \
+  --rationale 'Failing checks block the release' --next-action 'Inspect failing test output'
+# Compose: same command against its workspace
+docker compose exec -T github-reconciler gh-beads-triage BEAD_ID --reviewer agent \
+  --rationale 'Failing checks block the release' --next-action 'Inspect failing test output'
+```
+
+Each call appends a review without replacing notes/comments or setting priority, status, or assignee. Supply `--reviewer` or configure `BEADS_ACTOR`. Add `--expected-fingerprint VALUE` using the snapshot item's `triage.source_fingerprint` to refuse a review if imported evidence changed after inspection. Re-read after refusal or a busy lock. The guard applies to stored facts, not unseen upstream changes. Keep reviews concise and avoid secrets. Inspect full history under `metadata.triage.reviews` with `bd show`; sync preserves it. Later imported changes set triage status to `changed`; identical polls and local planning edits do not. Reviews do not expire or trigger automatic actions.
+
+MCP exposes `portfolio_snapshot` with `repositories` and `limit`, plus `record_triage` with `bead_id`, `rationale`, `next_action`, optional `reviewer`, and optional `expected_fingerprint`. These additions retain all official Beads tools.
+
+### Sync status and manual triage
 
 ```sh
 task sync-now
@@ -172,7 +242,44 @@ These are selected source observations, with the stored snapshot's `observed_at`
 
 Only authoritative `closingIssuesReferences` create blockers. GitHub resolves supported closing keywords, including recognized cross-repository references; arbitrary mentions and text in non-closing contexts do not create dependencies. Linked issues must already be indexed by the selected scopes. Removing a reference removes only edges managed by the hub. Existing manual edges are retained. Closing a PR releases its blocking effect through Beads' normal readiness rules.
 
-For backups, preserve the Compose data volume and use [Dolt backups](https://docs.dolthub.com/sql-reference/version-control/backups) appropriate to your storage. A consistent stopped-volume snapshot is also possible. Restore the workspace metadata and database together; test restoration before relying on a backup. Do not delete or reinitialize the data volume to work around startup errors. Initialization errors fail the container without a fallback destructive init.
+For backups, follow the [offline volume procedure](#backup-and-restore). Preserve workspace metadata, sync progress, and the full database together; test restoration before relying on a backup. Do not delete or reinitialize the data volume to work around startup errors. Initialization errors fail the container without a fallback destructive init.
+
+## Backup and restore
+
+The supported exercise uses an offline physical copy: stop every writer and Dolt before copying the complete workspace/volume. Issue JSONL alone omits database history and sync checkpoints. Never copy active database files. Preserve image/tool versions and non-secret deployment settings with backup records; inject credentials again when restoring. Protect backup storage as you would the backlog.
+
+For the default Compose project, this archives its stopped volume. Substitute the actual volume and matching runtime image if different:
+
+```sh
+backup_dir="$HOME/gh-beads-backups/$(date -u +%Y%m%dT%H%M%SZ)"
+mkdir -p "$backup_dir"
+chmod 700 "$backup_dir"
+task down
+# Stop external SQL clients too. Mount the source read-only.
+docker run --rm --network none --entrypoint tar \
+  --mount type=volume,src=gh-beads_data,dst=/data,readonly \
+  --mount "type=bind,src=$backup_dir,dst=/backup" \
+  gh-beads:test -C /data -czf /backup/workspace.tar.gz .
+task deploy
+```
+
+Restore to a new disposable project/volume first. Use an empty target with no clients. Do not restore over the live volume or reinitialize the backup:
+
+```sh
+docker volume create gh-beads-restore_data
+docker run --rm --network none --entrypoint tar \
+  --mount type=volume,src=gh-beads-restore_data,dst=/data \
+  --mount "type=bind,src=$backup_dir,dst=/backup,readonly" \
+  gh-beads:test -C /data -xzf /backup/workspace.tar.gz
+# Inject BEADS_REMOTE_PASSWORD; leave GitHub polling offline during inspection.
+GH_TOKEN= BEADS_UI_PORT=0 BEADS_MCP_PORT=0 BEADS_SQL_PORT=0 \
+  docker compose -p gh-beads-restore up -d --wait --wait-timeout 180
+docker compose -p gh-beads-restore exec -T github-reconciler gh-beads-snapshot --json
+```
+
+Compare source/local fields, stable IDs/epic parents, dependency edges, claims, priorities, labels, notes, full triage history, and `.github-sync-state.json` to pre-backup records. Confirm the volume is the restore target. Promote only after verification and reconnecting intended clients. The sample leaves the restore available for inspection; stop it when finished without touching the source project.
+
+`task smoke-restore` automates a fresh synthetic native embedded exercise: copy the stopped `.beads` workspace and progress, modify the original to prove independence, restore elsewhere, compare full records/graph/queues/progress, and replay sync with zero writes. It requires native Beads 1.3.1, no Docker or GitHub credential. `task smoke` adds SQL/Compose validation: restart the synthetic stack, stop application writers and capture a baseline, stop SQL, copy the entire volume to backup and then a separate restore project, start it, and compare full records/graph/reviews/queues/checkpoints. Both workflows clean up their own disposable data. Docker smoke execution requires a Docker host.
 
 ## Current limits
 

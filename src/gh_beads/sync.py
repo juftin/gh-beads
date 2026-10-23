@@ -21,9 +21,9 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import quote, unquote
 
-from beads_hub.description import describe
-from beads_hub.github import GitHub, RateLimited
-from beads_hub.state import SyncState
+from gh_beads.description import describe
+from gh_beads.github import GitHub, RateLimited
+from gh_beads.state import SyncState
 
 Json = dict[str, Any]
 """JSON objects exchanged with GitHub and bd."""
@@ -391,6 +391,7 @@ def reconcile(
     }
     before_writes = beads.writes
     repos = github.repositories(scopes)
+    state.inventory(scopes, repos, now=time.time())
     existing = beads.items()
     by_node: dict[str, Json] = {}
     by_ref: dict[str, Json] = {}

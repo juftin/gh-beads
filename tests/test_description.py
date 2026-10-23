@@ -8,9 +8,9 @@ import pytest
 from fixtures import FixtureGitHub, item, repository
 from test_sync import MemoryBeads
 
-from beads_hub.description import describe, link
-from beads_hub.github import node_metadata, source_metadata
-from beads_hub.sync import evaluate, reconcile
+from gh_beads.description import describe, link
+from gh_beads.github import node_metadata, source_metadata
+from gh_beads.sync import evaluate, reconcile
 
 
 def render(row: dict[str, object]) -> str:

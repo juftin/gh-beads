@@ -15,9 +15,9 @@ from fixtures import FixtureGitHub, item, repository
 from githubkit import GitHub as Client
 from test_sync import MemoryBeads
 
-from beads_hub import sync
-from beads_hub.github import GitHub, Json, RateLimited, node_metadata, source_metadata
-from beads_hub.state import FULL_SCAN_SECONDS, OVERLAP_SECONDS, SyncState
+from gh_beads import sync
+from gh_beads.github import GitHub, Json, RateLimited, node_metadata, source_metadata
+from gh_beads.state import FULL_SCAN_SECONDS, OVERLAP_SECONDS, SyncState
 
 
 def source(handler: Callable[[httpx.Request], httpx.Response], *, workers: int = 1) -> GitHub:
