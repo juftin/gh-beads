@@ -22,7 +22,7 @@ GitHub supplies source facts; Beads stores local triage and workflow decisions. 
 ## What it does
 
 - Collects issues and PRs from selected users, organizations, and explicit repositories, including private repositories visible to the credential.
-- Treats issues and PRs as peer Beads work items with native types, repository filters, and local classifications.
+- Treats issues and PRs as peer Beads tasks, with repository labels for filtering and local labels for classification.
 - Attaches author, assignee, milestone, date, repository, and PR review/CI/branch metadata to each bead.
 - Surfaces PRs needing attention alongside issues, and creates blocking dependencies from GitHub's recognized closing references.
 - Polls incrementally, refreshes open PR signals independently, and repairs coverage with periodic full scans.
@@ -76,7 +76,7 @@ Work items live in Dolt; the JSON file stores polling progress. There is no sepa
 
 ### Identity and repository grouping
 
-Each repository gets a Beads `epic` titled `OWNER/REPO`. New issues and PRs use `github_issue` and `pull_request` child types, distinguished further by labels and an external reference:
+Each repository gets a Beads `epic` titled `OWNER/REPO`. Its imported issues and PRs start as `task` children, distinguished by labels and an external reference:
 
 | GitHub source | External reference | Example labels |
 | --- | --- | --- |
@@ -106,19 +106,14 @@ GitHub assignees are source metadata; they do not claim a bead. Put durable loca
 
 The source snapshot includes:
 
-- **Source text and labels:** original title, body, URL, and sorted GitHub label names under `metadata.hub.github`, independently of generated display fields.
 - **People and planning:** author login/type, author association, GitHub assignees, milestone, and requested reviewers.
 - **Lifecycle and conversation size:** created/updated/closed dates, closure reason, comment count, and lock state.
-- **Repository context:** identity/name, description, visibility, default branch, primary language, stars, and fork/archive/disabled flags; repository epics retain these facts even without children.
+- **Repository context:** visibility, default branch, primary language, stars, and fork flag.
 - **PR evidence:** draft/mergeability/review/CI state, head/base branches and SHAs, additions/deletions/files/commits, cross-repository flag, and merge date.
 
 Reviewer details are bounded to 100 with explicit total/coverage fields. Closing-issue references are fully paginated. Comment bodies, diffs, full source payloads, and event history are not imported. See the [metadata contract](docs/architecture.md#source-metadata) for exact fields and observation semantics.
 
 Descriptions link to GitHub items/repositories, authors and assignees, milestones, requested reviewers/teams, fork-aware branch snapshots, PR checks/review pages, and closing issues. Generated table text is escaped; the original GitHub body remains intact below a separator. The `size:s/m/l` filters describe added+deleted lines (under 100 / 100–499 / 500+). `author:bot`, `links:closing-issue`, and `resolution:merged`/`resolution:not-planned` expose additional factual queues. These fields use existing source requests and preserve local priority and categories. See [triage usage](docs/usage.md#operate-and-triage).
-
-### Custom workflow
-
-New imports use native `github_issue` and `pull_request` types; existing local type choices remain intact. Sync and Compose startup register `backlog:active`, `in_review:wip`, and `icebox:frozen` for manual planning without replacing existing custom configuration. Backlog work can enter `bd ready` when unblocked; review work is in progress; icebox work stays out of ready and default lists. Snapshots include these queues. Automatic status selection stays unchanged, manual statuses survive refresh, and verified upstream closure still wins. See [configuration and commands](docs/usage.md#custom-statuses-and-types), including offline setup and deliberate conversion of legacy task imports.
 
 ### PR readiness and dependencies
 
@@ -368,7 +363,7 @@ The smoke workflow uses synthetic GitHub records with real Beads, Dolt, UI, and 
 
 ## Current scope and validation
 
-The current implementation has 157 passing offline tests, source/wheel build validation, native ARM64 macOS and AMD64 Linux embedded Dolt/concurrent polling/stdio/persistence validation, and linked-table Markdown/sanitization checks. A prior ARM64 Compose smoke pass covers installed commands, Beads lifecycle/graph behavior, UI WebSocket delivery, official MCP tools/resources over HTTP and stdio, authenticated remote SQL, and restart persistence. The latest embedded snapshot/review MCP checks, native custom statuses/types, structured source metadata, and independent backup/restore validation pass on AMD64 Linux, including installed CLIs and zero-write restored sync replay. Updated Docker assertions (epics, linked descriptions, reviews, custom workflow setup, and independent volume restore) await execution because Docker is unavailable here. GitHub HTTP tests use synthetic responses. A credentialed multi-repository pilot, AMD64 image build, full browser interaction suite, and SQL/Compose restore execution remain unverified.
+The current implementation has 146 passing offline tests, source/wheel build validation, native ARM64 macOS and AMD64 Linux embedded Dolt/concurrent polling/stdio/persistence validation, and linked-table Markdown/sanitization checks. A prior ARM64 Compose smoke pass covers installed commands, Beads lifecycle/graph behavior, UI WebSocket delivery, official MCP tools/resources over HTTP and stdio, authenticated remote SQL, and restart persistence. The latest embedded snapshot/review MCP checks and independent backup/restore validation pass on AMD64 Linux, including installed CLIs and zero-write restored sync replay. Updated Docker assertions (epics, linked descriptions, reviews, and independent volume restore) await execution because Docker is unavailable here. GitHub HTTP tests use synthetic responses. A credentialed multi-repository pilot, AMD64 image build, full browser interaction suite, and SQL/Compose restore execution remain unverified.
 
 Current boundaries include polling rather than webhooks, one shared backlog rather than tenant isolation or HA, selected source snapshots rather than complete conversations/diffs/history, and human/agent categorization rather than automatic classification. There is no GitHub write-back, automatic freshness alerting, or migration from the earlier SQLite application.
 

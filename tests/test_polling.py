@@ -28,10 +28,7 @@ def test_unchanged_poll_has_no_beads_writes() -> None:
         row["github"]["observed_at"] = "2026-10-21T12:01:00Z"
     beads.calls.clear()
     assert sync.reconcile(source, beads, "user:@me")["writes"] == 0
-    assert all(
-        args[0] == "list" or args[:2] in {("dep", "list"), ("config", "get")}
-        for args in beads.calls
-    )
+    assert all(args[0] == "list" or args[:2] == ("dep", "list") for args in beads.calls)
     beads.rows["hub-1"]["title"] = "An accidental local edit of a source-owned field"
     assert sync.reconcile(source, beads, "user:@me")["writes"] == 1
     assert beads.rows["hub-1"]["title"].endswith(issue["title"])

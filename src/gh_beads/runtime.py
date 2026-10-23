@@ -1,4 +1,4 @@
-"""Check workspace readiness and configure shared workflow or remote SQL access."""
+"""Check a Beads workspace or wait for an external SQL service during Compose startup."""
 
 from __future__ import annotations
 
@@ -80,21 +80,14 @@ def wait_for_hub(*, sql_only: bool = False, timeout: float = 120) -> None:
 
 
 def main() -> None:
-    """Wait for a runtime dependency or configure the shared workspace."""
+    """Wait for a runtime dependency or provision database-scoped remote access."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sql", action="store_true", help="Wait only for the SQL listener")
     parser.add_argument(
         "--configure-remote", action="store_true", help="Provision remote SQL access"
     )
-    parser.add_argument(
-        "--configure-workflow", action="store_true", help="Register hub statuses and issue types"
-    )
     args = parser.parse_args()
-    if args.configure_workflow:
-        from gh_beads.sync import Beads
-
-        Beads().configure_workflow()
-    elif args.configure_remote:
+    if args.configure_remote:
         configure_remote_access()
     else:
         wait_for_hub(sql_only=args.sql)

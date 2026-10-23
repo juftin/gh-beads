@@ -294,11 +294,10 @@ def test_team_and_unavailable_reviewer_metadata() -> None:
     assert metadata["requested_reviewers_complete"] is False
 
 
-@pytest.mark.parametrize("stored_labels", [None, [], ["from metadata"]])
-def test_delta_uses_all_states_and_refreshes_unchanged_pr(stored_labels: list[str] | None) -> None:
+def test_delta_uses_all_states_and_refreshes_unchanged_pr() -> None:
     """An empty REST delta still reads live PR signals and retains known common metadata."""
     pr = item("pr")
-    bead: Json = {
+    bead = {
         "labels": ["github:help%20wanted"],
         "metadata": {
             "hub": {
@@ -307,8 +306,6 @@ def test_delta_uses_all_states_and_refreshes_unchanged_pr(stored_labels: list[st
             }
         },
     }
-    if stored_labels is not None:
-        bead["metadata"]["hub"]["github"]["labels"] = stored_labels
     since = "2026-10-21T12:00:00+00:00"
     requests: list[str] = []
 
@@ -327,7 +324,7 @@ def test_delta_uses_all_states_and_refreshes_unchanged_pr(stored_labels: list[st
         rows = github.items(repository(), since=since, prs=[bead])
     assert requests == ["GET", "POST"]
     assert len(rows) == 1 and rows[0]["kind"] == "pr"
-    assert rows[0]["labels"] == (["help wanted"] if stored_labels is None else stored_labels)
+    assert rows[0]["labels"] == ["help wanted"]
     assert rows[0]["github"]["author"]["login"] == "synthetic-author"
     assert rows[0]["github"]["pull_request"]["review_decision"] == "CHANGES_REQUESTED"
 

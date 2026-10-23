@@ -157,36 +157,6 @@ Host pointers have separate filesystem locks/progress, even when addressing the 
 
 ## Operate and triage
 
-### Custom statuses and types
-
-Sync registers native `github_issue` and `pull_request` types for new imports, plus `in_review`, `backlog`, and `icebox` statuses for manual triage. Repository containers remain `epic`. Existing imports retain their local types, including legacy `task`, and source labels `type:issue` / `type:pr` continue to work across both generations. To adopt the native type for an existing item deliberately, use `bd update ID --type github_issue --json` or `bd update ID --type pull_request --json`.
-
-Registration preserves other configured custom types/statuses and any categories already assigned to the same names. It happens during successful sync and Compose startup. For an initialized offline workspace, run:
-
-```sh
-uv run --locked gh-beads-runtime --configure-workflow
-bd statuses --json
-bd types --json
-```
-
-The default status categories are:
-
-| Status | Category | Workflow |
-| --- | --- | --- |
-| `backlog` | `active` | Available work; eligible for `bd ready` when unblocked |
-| `in_review` | `wip` | Review underway; visible in default lists, excluded from ready |
-| `icebox` | `frozen` | On hold; excluded from ready and default lists |
-
-```sh
-bd update ID --status backlog --add-label hub:manual-status --json
-bd update ID --status in_review --add-label hub:manual-status --json
-bd update ID --status icebox --add-label hub:manual-status --json
-bd list --status icebox --all --limit 0 --flat --json
-bd list --type pull_request --all --limit 0 --flat --json
-```
-
-The official MCP `update` tool accepts the configured statuses; `list` can filter by custom status/type, and `create` accepts custom types. Portfolio snapshots include `backlog`, `in_review`, and `icebox` queues; in-review items also appear in `in_progress`. Automatic status selection remains unchanged. Sync preserves manual choices, and verified GitHub closure still closes the bead. See the [native configuration reference](https://beads.gascity.com/reference/configuration#custom-statuses-and-types) for category behavior.
-
 ### Portfolio snapshot and saved decisions
 
 Start portfolio triage with one stored view:
@@ -246,9 +216,9 @@ bd update <id> --claim
 bd blocked --json
 ```
 
-GitHub labels appear as `github:<percent-encoded-name>` to avoid collisions with local categories and comma-based CLI filters. For example, `bug` becomes `github:bug` and `help wanted` becomes `github:help%20wanted`. The reconciler owns source title/description; put durable reasoning in Beads notes and comments. Beads priority and issue/PR type are local choices (new imports start as `github_issue` / `pull_request`, priority 2); repository containers stay `epic`.
+GitHub labels appear as `github:<percent-encoded-name>` to avoid collisions with local categories and comma-based CLI filters. For example, `bug` becomes `github:bug` and `help wanted` becomes `github:help%20wanted`. The reconciler owns source title/description; put durable reasoning in Beads notes and comments. Beads priority and issue/PR type are local choices (imports start as `task`, priority 2); repository containers stay `epic`.
 
-Every imported issue/PR also carries source facts under `metadata.hub.github`: original title/body/labels/URL, author, upstream assignees, milestone, dates, comment count, repository details, and PR branch SHAs, size, reviewer requests, merge/review/CI state. Repository epics retain selected repository facts in the same namespace. Inspect these with `bd show <id> --json`; consume metadata directly for integrations. Descriptions show an attention summary and a linked two-column table, followed by the unchanged GitHub body. Links open the source item/repository, author and assignees, milestone, requested reviewers/teams, source branch snapshots (including forks), PR checks/review pages, and closing issues. Missing forks retain plain branch text; incomplete reviewer lists are marked. GitHub assignees do not claim the bead. Repository grouping remains the `repo:OWNER/REPO` label, with stable repository identity in `metadata.hub.repo_id`.
+Every imported issue/PR also carries source facts under `metadata.hub.github`: author, upstream assignees, milestone, dates, comment count, repository details, and PR branch SHAs, size, reviewer requests, merge/review/CI state. Inspect these with `bd show <id> --json`. Descriptions show an attention summary and a linked two-column table, followed by the unchanged GitHub body. Links open the source item/repository, author and assignees, milestone, requested reviewers/teams, source branch snapshots (including forks), PR checks/review pages, and closing issues. Missing forks retain plain branch text; incomplete reviewer lists are marked. GitHub assignees do not claim the bead. Repository grouping remains the `repo:OWNER/REPO` label, with stable repository identity in `metadata.hub.repo_id`.
 
 New source filters are sync-owned:
 

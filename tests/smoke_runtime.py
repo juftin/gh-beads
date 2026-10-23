@@ -47,8 +47,6 @@ def main() -> None:
     issue_id, pr_id = rows["issue"]["id"], rows["pr"]["id"]
     epic_id = rows["repository"]["id"]
     assert rows["repository"]["issue_type"] == "epic"
-    assert rows["issue"]["issue_type"] == "github_issue"
-    assert rows["pr"]["issue_type"] == "pull_request"
     assert rows["issue"]["parent"] == rows["pr"]["parent"] == epic_id
     snapshot = rows["pr"]["metadata"]["hub"]["github"]
     assert snapshot["author"]["login"] == "synthetic-author"

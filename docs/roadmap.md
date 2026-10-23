@@ -12,8 +12,8 @@ The first milestone is an independently runnable Beads backlog that treats GitHu
 | Continuous lifecycle convergence | Implemented with independent PR signal refresh, replay after partial failures, and explicit closure verification | Serial writes; optional 2–4 read workers; repository indexes, pass-local graph reads, and one progress commit per pass |
 | GitHub progress visibility | Implemented in atomic shared-volume JSON state and `task sync-status` | Last successful coverage/errors per repository and durable rate cooldowns; database health alone is insufficient |
 | Automatic freshness alerts | Pending | Alert on stale/failed source coverage independently of database health |
-| Informative GitHub metadata | Implemented in `metadata.hub.github`, including original title/body/labels and repository epic facts | Structured source facts drive integrations and label recovery; description/filter projections remain; bounded reviewer details, no conversations/diffs |
-| Native workflow types and statuses | Implemented with `github_issue` / `pull_request` types and manual `in_review:wip`, `backlog:active`, `icebox:frozen` statuses | Additive shared configuration during sync/Compose startup or offline runtime command; existing local types/categories retained; snapshots expose workflow queues |
+| Informative GitHub metadata | Implemented in `metadata.hub.github` and description summaries | Selected source facts; bounded reviewer details, no conversations/diffs |
+| Expanded metadata and custom workflow types/statuses | Deferred pending beads-ui support | Watch upstream releases for custom type/status discovery, editing, filters, board/category behavior, frozen-item access, and metadata visualization; see [compatibility watch](#beads-ui-compatibility-watch) |
 | Linked triage descriptions and factual filters | Implemented with attention summaries, Markdown tables, canonical source links, fork snapshots, closing references, and size/bot/link/resolution labels | Existing reads only; body remains verbatim; missing facts and incomplete reviewer coverage are explicit |
 | Detailed checks and review threads | Pending | Bounded check names/details URLs and unresolved review-thread evidence |
 | Explicit issue blockers | Pending | Source-owned issue-to-issue dependencies beyond PR closing references |
@@ -26,10 +26,22 @@ The first milestone is an independently runnable Beads backlog that treats GitHu
 | Local embedded Dolt and stdio MCP | Implemented as the local default with repository-local storage and no SQL listener | Current-directory or explicit workspace; native ARM64 initialization, concurrent poller/MCP access, shared locking, and persistence verified with `task smoke-local` |
 | Python source package and uv workflows | Implemented in `src/gh_beads` with the uv build backend and installed sync/MCP/runtime commands | Locked editable development install, non-editable Docker install, source distribution and wheel via `task package` |
 | Unified image and Docker Compose deployment | Implemented | Four services, one persistent volume, localhost ports; operator supplies runtime credentials |
-| Runtime and regression validation | 157 offline tests, installed CLI and stdio default checks, native custom status/category/type and metadata checks, source/wheel builds, operation-count and repair-coverage regressions, native ARM64 macOS and AMD64 Linux embedded Dolt validation, linked table renderer checks, and prior Compose smoke coverage | Latest embedded CLI/MCP review/snapshot/workflow and offline restore checks pass on AMD64 Linux; Docker epic/link/triage/workflow/restore assertions await execution; credentialed pilot, AMD64 image build, and full browser interactions remain unverified; see checklist |
+| Runtime and regression validation | 146 offline tests, installed CLI and stdio default checks, source/wheel builds, operation-count and repair-coverage regressions, native ARM64 macOS and AMD64 Linux embedded Dolt validation, linked table renderer checks, and prior Compose smoke coverage | Latest embedded CLI/MCP review/snapshot and offline restore checks pass on AMD64 Linux; Docker epic/link/triage/restore assertions await execution; credentialed pilot, AMD64 image build, and full browser interactions remain unverified; see checklist |
 | Live multi-repository pilot | Pending | Needs an authorized GitHub credential and Docker host |
 | Backup/restore exercise | Native embedded offline copy/independent restore passes; Compose smoke and operator runbook implemented | Preserves full workspace, graph, local decisions, and checkpoints; SQL/Compose restore execution requires a Docker host |
 
 Before adopting this as a daily backlog, run a credentialed pilot across issue-only, PR-only, private, and organization repositories. Confirm visibility, merge policy signals, graph cleanup, and operational freshness. Record request volume, `writes`, pass duration, and throttling before deciding whether GraphQL batching, conditional HTTP caching, different worker counts, or per-repository cadence are needed.
 
 HA, webhooks, automatic GitHub writes, model-driven categorization, full conversation/code ingestion, built-in authentication, and migration from the earlier application are outside this milestone. Add them only when a workflow demonstrates the need and defines completion criteria.
+
+## beads-ui compatibility watch
+
+On 2026-10-23, we reverted the expanded metadata and native workflow changes from `a6b39d6` because pinned beads-ui 0.12.6 cannot fully visualize or manage them. The candidate types were `github_issue` and `pull_request`; the manual statuses were `in_review:wip`, `backlog:active`, and `icebox:frozen`. Existing selected GitHub metadata and rendered descriptions remain supported by the hub.
+
+Check [beads-ui releases](https://github.com/mantoni/beads-ui/releases) when reviewing dependency updates. Reconsider these features after upstream provides:
+
+- Discovery of configured custom statuses/types, correct labels, and editing/filter options rather than fixed built-in lists.
+- Category-aware board placement and a way to browse frozen work such as icebox items.
+- A useful view of namespaced issue metadata, including `metadata.hub.github`.
+
+Verify the released UI against the pinned Beads version in a browser before reintroducing these changes. Exercise create/edit/filter/board/detail flows and refresh after external sync writes; passing CLI/MCP tests alone is insufficient. This is a dependency-review watch item, not an automated monitor.

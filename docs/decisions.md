@@ -10,6 +10,12 @@ The image pins Beads/beads-mcp 1.3.1, Dolt 2.5.1, beads-ui 0.12.6, and uv 0.12.1
 
 Source contracts: [Beads initialization](https://github.com/gastownhall/beads/blob/v1.3.1/cmd/bd/init.go), [official MCP](https://github.com/gastownhall/beads/tree/v1.3.1/integrations/beads-mcp), [UI package](https://www.npmjs.com/package/beads-ui/v/0.12.6). The UI launcher daemonizes, so its pinned `server/index.js` runs directly in the container. This internal entrypoint must be revalidated when updating the UI version.
 
+## Gate workflow extensions on UI support
+
+On 2026-10-23, we abandoned the expanded metadata/custom workflow changes in `a6b39d6` at the user's request. Beads CLI/MCP support is insufficient when the shared UI cannot visualize or manage the same workflow. Retain the existing task imports, built-in automatic statuses, and selected GitHub metadata/description summaries until the UI supports the proposed extensions.
+
+Inspection of beads-ui 0.12.6 found fixed [status definitions](https://github.com/mantoni/beads-ui/blob/v0.12.6/app/protocol.js) and [type options](https://github.com/mantoni/beads-ui/blob/v0.12.6/app/utils/issue-type.js), unknown custom [type badges](https://github.com/mantoni/beads-ui/blob/v0.12.6/app/utils/type-badge.js), an [in-progress query limited to `in_progress`](https://github.com/mantoni/beads-ui/blob/v0.12.6/server/list-adapters.js), and no namespaced metadata viewer in the detail view. A current custom status may render as text without being available for selection or filtering. Frozen items are absent from the default listing. Track the [roadmap watch item](roadmap.md#beads-ui-compatibility-watch) and require browser validation before restoring these capabilities.
+
 ## Enumerate repositories instead of global item search
 
 The original draft used GraphQL search. GitHub search has a result cap and is not a safe global open-item inventory. This version accepts user/org/repo inventory scopes and paginates repository issue listings, which include PRs, then fetches PR signals via GraphQL. Full open inventories bootstrap and repair coverage; all-state incremental reads handle ordinary updates without adaptive search partitioning.

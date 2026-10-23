@@ -13,7 +13,6 @@ if [ ! -f "$workspace/.beads/metadata.json" ]; then
     --prefix "${BEADS_PREFIX:-hub}" --non-interactive --skip-agents --skip-hooks
 fi
 gh-beads-runtime
-gh-beads-runtime --configure-workflow
 gh-beads-runtime --configure-remote
 unset BEADS_REMOTE_PASSWORD
 

@@ -125,11 +125,9 @@ def portfolio_snapshot(
                 "id": row["id"],
                 "repository": hub["repo"],
                 "kind": hub["kind"],
-                "issue_type": row.get("issue_type"),
                 "number": hub["number"],
                 "title": row.get("title"),
-                "url": (hub.get("github") or {}).get("url")
-                or f"https://github.com/{hub['repo']}/{url_kind}/{hub['number']}",
+                "url": f"https://github.com/{hub['repo']}/{url_kind}/{hub['number']}",
                 "source_state": hub.get("source_state"),
                 "status": row.get("status"),
                 "priority": row.get("priority", 2),
@@ -177,12 +175,7 @@ def portfolio_snapshot(
         "queues": {
             "ready": queue([row for row in active if row["id"] in ready]),
             "blocked": queue([row for row in active if row["id"] in blocked]),
-            "in_progress": queue(
-                [row for row in active if row["status"] in {"in_progress", "in_review"}]
-            ),
-            "in_review": queue([row for row in active if row["status"] == "in_review"]),
-            "backlog": queue([row for row in active if row["status"] == "backlog"]),
-            "icebox": queue([row for row in active if row["status"] == "icebox"]),
+            "in_progress": queue([row for row in active if row["status"] == "in_progress"]),
             "needs_attention": queue([row for row in active if set(row["labels"]) & ATTENTION]),
             "unreviewed": queue([row for row in active if row["triage"]["status"] == "unreviewed"]),
             "changed_since_review": queue(

@@ -26,21 +26,12 @@ class MemoryBeads(sync.Beads):
         self.edges: set[tuple[str, str]] = set()
         self.calls: list[tuple[str, ...]] = []
         self.writes = 0
-        self.config: dict[str, str] = {}
 
     def call(self, *args: str) -> Any:
         """Emulate the bd commands used by the adapter, rejecting unsupported calls."""
         self.calls.append(args)
-        if args[0] in {"create", "update"} or args[:2] in {
-            ("dep", "add"),
-            ("dep", "remove"),
-            ("config", "set"),
-        }:
+        if args[0] in {"create", "update"} or args[:2] in {("dep", "add"), ("dep", "remove")}:
             self.writes += 1
-        if args[0] == "config":
-            if args[1] == "set":
-                self.config[args[2]] = args[3]
-            return {"key": args[2], "value": self.config.get(args[2], "")}
         if args[0] == "list":
             assert "--limit" in args and args[args.index("--limit") + 1] == "0"
             return copy.deepcopy(list(self.rows.values()))
@@ -155,17 +146,13 @@ def test_repeat_sync_preserves_local_triage_and_updates_source() -> None:
     assert local["metadata"]["other"] == {"keep": True}
 
 
-@pytest.mark.parametrize("status", ["deferred", "in_review", "backlog", "icebox"])
-def test_manual_status_survives_sync(status: str) -> None:
+def test_manual_status_survives_sync() -> None:
     """A locally deferred or closed item stays in its chosen workflow state."""
     source, beads = FixtureGitHub([item()]), MemoryBeads()
     sync.reconcile(source, beads, "user:@me")
-    beads.rows["hub-1"]["status"] = status
+    beads.rows["hub-1"]["status"] = "deferred"
     sync.reconcile(source, beads, "user:@me")
-    assert beads.rows["hub-1"]["status"] == status
-    source.rows[0]["state"] = "CLOSED"
-    sync.reconcile(source, beads, "user:@me")
-    assert beads.rows["hub-1"]["status"] == "closed"
+    assert beads.rows["hub-1"]["status"] == "deferred"
 
 
 def test_absence_requires_explicit_closure_and_reopen() -> None:
@@ -374,9 +361,6 @@ def test_metadata_refresh_preserves_local_fields() -> None:
     sync.reconcile(source, beads, "user:@me")
     bead = beads.rows["hub-1"]
     snapshot = bead["metadata"]["hub"]["github"]
-    assert snapshot["title"] == row["title"]
-    assert snapshot["body"] == row["body"]
-    assert snapshot["labels"] == sorted(row["labels"])
     assert snapshot["author"]["login"] == "synthetic-author"
     assert snapshot["assignees"] == ["synthetic-assignee"]
     assert snapshot["pull_request"]["head_sha"] == "a" * 40
@@ -394,88 +378,6 @@ def test_metadata_refresh_preserves_local_fields() -> None:
     assert snapshot["pull_request"]["requested_reviewers"] == []
     assert bead["assignee"] == "local-maintainer" and bead["notes"] == "Keep this"
     assert bead["priority"] == 1 and bead["metadata"]["local"] == {"keep": True}
-
-
-def test_workflow_configuration_is_additive_and_idempotent() -> None:
-    """Keep custom entries and categories selected by operators, and register missing names."""
-    beads = MemoryBeads()
-    beads.config.update(
-        {"status.custom": "qa:wip,in_review:active", "types.custom": "incident,pull_request"}
-    )
-    beads.configure_workflow()
-    assert beads.config == {
-        "status.custom": "qa:wip,in_review:active,backlog:active,icebox:frozen",
-        "types.custom": "incident,pull_request,github_issue",
-    }
-    assert beads.writes == 2
-    beads.configure_workflow()
-    assert beads.writes == 2
-
-
-def test_workflow_configuration_failure_does_not_import_or_checkpoint(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    """A registration failure leaves the repository replayable before custom-type creation."""
-    source, beads, state = FixtureGitHub([item()]), MemoryBeads(), SyncState()
-    original = beads.call
-
-    def fail_config(*args: str) -> Any:
-        if args[:2] == ("config", "set"):
-            raise RuntimeError("Synthetic configuration failure")
-        return original(*args)
-
-    monkeypatch.setattr(beads, "call", fail_config)
-    result = sync.reconcile(source, beads, "user:@me", state)
-    assert result["status"] == "partial" and not beads.rows
-    assert not state.data["repositories"]["R_1"].get("checkpoint")
-    monkeypatch.setattr(beads, "call", original)
-    assert sync.reconcile(source, beads, "user:@me", state)["status"] == "complete"
-    assert beads.rows["hub-1"]["issue_type"] == "github_issue"
-
-
-def test_native_import_types_preserve_existing_local_choices() -> None:
-    """Use custom types at creation, retaining local types and legacy task imports on refresh."""
-    source, beads = FixtureGitHub([item(), item("pr", 2)]), MemoryBeads()
-    assert sync.reconcile(source, beads, "user:@me")["status"] == "complete"
-    assert beads.rows["hub-1"]["issue_type"] == "github_issue"
-    assert beads.rows["hub-2"]["issue_type"] == "pull_request"
-    beads.rows["hub-1"]["issue_type"] = "bug"
-    beads.rows["hub-2"]["issue_type"] = "task"
-    source.rows[0]["title"] = "Changed source title"
-    assert sync.reconcile(source, beads, "user:@me")["status"] == "complete"
-    assert beads.rows["hub-1"]["issue_type"] == "bug"
-    assert beads.rows["hub-2"]["issue_type"] == "task"
-
-
-def test_source_metadata_survives_display_label_edits() -> None:
-    """Direct closure uses stored source labels and replaces stale source text independently."""
-    row = item("pr")
-    source, beads = FixtureGitHub([row]), MemoryBeads()
-    sync.reconcile(source, beads, "user:@me")
-    bead = beads.rows["hub-1"]
-    bead["labels"] = ["github:invented", "category:keep"]
-    closed = dict(row, state="MERGED", title="Merged title", body="Updated body")
-    # GraphQL closure evidence has no REST labels.
-    closed.pop("labels")
-    beads.close_source(copy.deepcopy(bead), closed)
-    snapshot = bead["metadata"]["hub"]["github"]
-    assert snapshot["title"] == "Merged title" and snapshot["body"] == "Updated body"
-    assert snapshot["labels"] == sorted(row["labels"])
-    assert "github:invented" not in bead["labels"] and "category:keep" in bead["labels"]
-
-
-def test_repository_epic_retains_structured_source_metadata() -> None:
-    """Empty repositories retain source facts without borrowing a child description."""
-    repo = dict(repository(), description="Repository source text", visibility="private")
-    source, beads = FixtureGitHub([], [repo]), MemoryBeads()
-    sync.reconcile(source, beads, "user:@me")
-    epic = beads.rows["hub-epic-1"]
-    assert epic["metadata"]["hub"]["github"]["description"] == "Repository source text"
-    assert epic["metadata"]["hub"]["github"]["visibility"] == "private"
-    assert sync.reconcile(source, beads, "user:@me")["writes"] == 0
-    repo["description"] = None
-    sync.reconcile(source, beads, "user:@me")
-    assert epic["metadata"]["hub"]["github"]["description"] is None
 
 
 def test_verified_closure_refreshes_evidence() -> None:
