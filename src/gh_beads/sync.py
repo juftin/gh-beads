@@ -19,10 +19,10 @@ import sys
 import time
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, unquote
+from urllib.parse import quote
 
 from gh_beads.description import describe
-from gh_beads.github import GitHub, RateLimited
+from gh_beads.github import GitHub, RateLimited, observed_at, repository_metadata, source_labels
 from gh_beads.state import SyncState
 
 Json = dict[str, Any]
@@ -42,6 +42,15 @@ MANAGED_PREFIXES = (
     "resolution:",
 )
 """Label namespaces owned exclusively by reconciliation."""
+
+SOURCE_TYPES = {"issue": "github_issue", "pr": "pull_request"}
+"""Default native types for new imports; existing local type choices are retained."""
+
+WORKFLOW_CONFIG = {
+    "status.custom": ("in_review:wip", "backlog:active", "icebox:frozen"),
+    "types.custom": tuple(SOURCE_TYPES.values()),
+}
+"""Shared Beads extensions, added without replacing existing project configuration."""
 
 
 def command(args: list[str]) -> Any:
@@ -172,9 +181,23 @@ class Beads:
     def call(self, *args: str) -> Any:
         """Invoke the configured bd executable with machine-readable output."""
         result = command([os.environ.get("BEADS_PATH", "bd"), *args, "--json"])
-        if args[0] in {"create", "update"} or args[:2] in {("dep", "add"), ("dep", "remove")}:
+        if args[0] in {"create", "update"} or args[:2] in {
+            ("dep", "add"),
+            ("dep", "remove"),
+            ("config", "set"),
+        }:
             self.writes += 1
         return result
+
+    def configure_workflow(self) -> None:
+        """Register missing custom statuses/types while retaining operator choices."""
+        for key, defaults in WORKFLOW_CONFIG.items():
+            value = self.call("config", "get", key)["value"] or ""
+            entries = [entry.strip() for entry in value.split(",") if entry.strip()]
+            names = {entry.split(":", 1)[0] for entry in entries}
+            missing = [entry for entry in defaults if entry.split(":", 1)[0] not in names]
+            if missing:
+                self.call("config", "set", key, ",".join([*entries, *missing]))
 
     def items(self) -> list[Json]:
         """Load every source-backed bead, explicitly disabling the CLI result limit."""
@@ -200,6 +223,9 @@ class Beads:
         }
         hub = dict(((bead or {}).get("metadata") or {}).get("hub") or {})
         hub.update(node_id=repo["node_id"], repo_id=repo["node_id"], repo=name, kind="repository")
+        hub["github"] = snapshot_metadata(
+            {**repository_metadata(repo), "observed_at": observed_at()}, hub.get("github", {})
+        )
         if bead is None:
             bead = self.call(
                 "create",
@@ -249,11 +275,7 @@ class Beads:
             {
                 **item,
                 "github": {**bead["metadata"]["hub"].get("github", {}), **item.get("github", {})},
-                "labels": [
-                    unquote(label.removeprefix("github:"))
-                    for label in bead.get("labels") or []
-                    if label.startswith("github:")
-                ],
+                "labels": source_labels(bead),
             },
             bead,
         )
@@ -274,7 +296,17 @@ class Beads:
             "kind": item["kind"],
             "number": item["number"],
             "source_state": item["state"],
-            "github": snapshot_metadata(item.get("github", {}), previous_hub.get("github", {})),
+            "github": snapshot_metadata(
+                {
+                    **item.get("github", {}),
+                    "title": item["title"],
+                    "body": item.get("body") or "",
+                    "url": item["url"],
+                    "labels": sorted(item["labels"]),
+                    "observed_at": (item.get("github") or {}).get("observed_at") or observed_at(),
+                },
+                previous_hub.get("github", {}),
+            ),
         }
         if bead is None:
             bead = self.call(
@@ -282,7 +314,7 @@ class Beads:
                 "--title",
                 title,
                 "--type",
-                "task",
+                SOURCE_TYPES[item["kind"]],
                 "--external-ref",
                 source_ref(item),
                 "--description",
@@ -411,6 +443,7 @@ def reconcile(
     active_prs: list[tuple[Json, Json]] = []
     pending: dict[str, tuple[Json, float, bool]] = {}
     failed: set[str] = set()
+    workflow_ready = False
     for repo in repos:
         started = time.time()
         since = state.since(repo, now=started)
@@ -451,6 +484,9 @@ def reconcile(
                     if item["state"] in {"CLOSED", "MERGED"}:
                         closing.append((item, bead))
             # Complete source reads and validation precede this repository's writes.
+            if not workflow_ready:
+                beads.configure_workflow()
+                workflow_ready = True
             epic = beads.repository(
                 repo,
                 by_node.get(repo["node_id"]) or by_ref.get(f"gh:{repo['full_name']}#repository"),

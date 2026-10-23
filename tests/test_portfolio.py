@@ -78,6 +78,26 @@ def test_snapshot_complete_bounded_readonly(workspace: Path) -> None:
     assert not (workspace / ".github-sync-state.json").exists()
 
 
+def test_snapshot_custom_workflow_queues(workspace: Path) -> None:
+    """Keep manual review/backlog/icebox work visible with native types and stored links."""
+    beads, state = PortfolioBeads(), SyncState()
+    reconcile(FixtureGitHub([item(number=n) for n in range(1, 4)]), beads, "user:@me", state)
+    for bead_id, status in zip(beads.rows, ["open", "in_review", "backlog", "icebox"], strict=True):
+        beads.rows[bead_id]["status"] = status
+    beads.rows["hub-1"]["metadata"]["hub"]["github"]["url"] = (
+        "https://github.com/example/canonical/issues/1"
+    )
+    result = portfolio_snapshot(beads=beads, state=state)
+    assert result["queues"]["in_progress"]["total"] == 1
+    for status in ("in_review", "backlog", "icebox"):
+        row = result["queues"][status]["items"][0]
+        assert row["status"] == status and row["issue_type"] == "github_issue"
+    assert (
+        result["queues"]["in_review"]["items"][0]["url"]
+        == "https://github.com/example/canonical/issues/1"
+    )
+
+
 def test_scope_inventory_survives_selected_runs_and_restart(workspace: Path) -> None:
     beads, state = PortfolioBeads(), SyncState(workspace / ".github-sync-state.json")
     first, second = repository(), repository("example/other", "R_2")

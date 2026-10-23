@@ -19,6 +19,29 @@ from fixtures import FixtureGitHub, item
 from gh_beads.sync import Beads, run_sync
 
 
+def check_workflow(beads: Beads) -> None:
+    """Exercise custom categories, native types, metadata, and repeat sync against real bd."""
+    rows = {row["metadata"]["hub"]["kind"]: row for row in beads.items()}
+    assert rows["issue"]["issue_type"] == "github_issue"
+    assert rows["pr"]["issue_type"] == "pull_request"
+    source = rows["pr"]["metadata"]["hub"]["github"]
+    assert source["body"] == "Synthetic source body"
+    assert source["labels"] == ["bug", "label,with,commas"]
+    statuses = {row["name"]: row["category"] for row in beads.call("statuses")["custom_statuses"]}
+    assert statuses == {"qa": "wip", "in_review": "wip", "backlog": "active", "icebox": "frozen"}
+    assert "incident" in beads.call("types")["custom_types"]
+    pr = rows["pr"]
+    for status, ready in [("in_review", False), ("backlog", True), ("icebox", False)]:
+        beads.call("update", pr["id"], "--status", status)
+        assert (pr["id"] in {row["id"] for row in beads.call("ready", "--limit", "0")}) == ready
+        visible = {row["id"] for row in beads.call("list", "--limit", "0", "--flat")}
+        assert (pr["id"] in visible) == (status != "icebox")
+        assert run_sync()["writes"] == 0
+        current = next(row for row in beads.items() if row["id"] == pr["id"])
+        assert current["status"] == status
+    beads.call("update", pr["id"], "--status", pr["status"])
+
+
 async def check_clients(source: FixtureGitHub, beads: Beads) -> None:
     """Overlap real MCP reads with poller writes, then reopen MCP to verify durable state."""
     issue_id = next(row["id"] for row in beads.items() if row["metadata"]["hub"]["kind"] == "issue")
@@ -29,6 +52,14 @@ async def check_clients(source: FixtureGitHub, beads: Beads) -> None:
             assert "ready" in {tool.name for tool in await client.list_tools()}
             assert await client.read_resource("beads://quickstart")
             if session == 0:
+                for status in ("in_review", "backlog", "icebox"):
+                    updated = await client.call_tool(
+                        "update", {"issue_id": issue_id, "status": status}
+                    )
+                    assert not updated.is_error
+                    snapshot = await client.call_tool("portfolio_snapshot", {})
+                    assert snapshot.data["queues"][status]["items"][0]["id"] == issue_id
+                beads.call("update", issue_id, "--status", "open")
                 reviewed = await client.call_tool(
                     "record_triage",
                     {
@@ -117,6 +148,12 @@ def main() -> None:
                 metadata = json.loads(Path(".beads/metadata.json").read_text())
                 assert metadata["dolt_mode"] == "embedded"
                 assert Path(".beads/embeddeddolt").is_dir()
+                beads = Beads()
+                beads.call("config", "set", "status.custom", "qa:wip")
+                beads.call("config", "set", "types.custom", "incident")
+                subprocess.run(
+                    ["gh-beads-runtime", "--configure-workflow"], check=True, timeout=120
+                )
                 issue, pr = item(), item("pr", number=2)
                 pr["closingIssuesReferences"]["nodes"] = [{"id": issue["id"]}]
                 source = FixtureGitHub([issue, pr])
@@ -125,7 +162,8 @@ def main() -> None:
                 with patch("gh_beads.sync.GitHub", return_value=source):
                     result = run_sync()
                     assert result["status"] == "complete", result
-                    asyncio.run(check_clients(source, Beads()))
+                    check_workflow(beads)
+                    asyncio.run(check_clients(source, beads))
                 status = subprocess.run(
                     ["gh-beads-sync", "--status"],
                     check=True,

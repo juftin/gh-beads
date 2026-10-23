@@ -24,16 +24,17 @@ Sync owns each imported issue/PR's parent and repairs it with `bd update --paren
 
 ### Source metadata
 
-`metadata.hub.github` holds selected source facts, distinct from local Beads fields:
+`metadata.hub.github` holds selected source facts, distinct from local Beads fields. This uses Beads' [namespaced metadata extension point](https://beads.gascity.com/core-concepts/metadata); consumers read structured facts instead of parsing descriptions or display labels. Repository epics also store selected repository facts here, including identity/name, URL, description, visibility, default branch, language, stars, fork/archive/disabled flags, and observation time, even when there are no children.
 
 | Fields | Content |
 | --- | --- |
+| `title`, `body`, `labels` | Original source title, normalized body (empty when absent), and sorted GitHub label names, independent of rendered Beads fields |
 | `url`, `author`, `author_association`, `assignees` | Upstream link, author login/type and relationship, GitHub assignee logins |
 | `links` | Canonical source URLs for the author, assignees keyed by login, and milestone; missing destinations remain null/absent |
 | `milestone` | Number, title, state, due date, or null |
 | `created_at`, `updated_at`, `closed_at`, `state_reason` | Source dates and closure reason |
 | `comment_count`, `locked` | Conversation size and lock flag; no comment bodies |
-| `repository` | Visibility, default branch, primary language, stars, fork flag |
+| `repository` | Node ID/name, URL, description, visibility, default branch, primary language, stars, fork/archive/disabled flags |
 | `observed_at` | UTC time of the source observation; GitHub's update date alone does not establish CI freshness |
 | `pull_request` | Draft, mergeability and merge state, review decision, latest CI state, head/base branch names and SHAs, nullable head repository identity/URL, additions/deletions/files/commits, cross-repository flag, merge date, requested reviewers with URLs, and fully paginated closing-issue identities/URLs/repositories |
 
@@ -42,6 +43,8 @@ Requested reviewers include the first 100 entries, with `requested_reviewers_tot
 The description starts with a deterministic attention summary derived from existing source signals, followed by a two-column Markdown table and the original GitHub body verbatim after a separator. Links cover the source item, repository, people/teams, milestone, branch snapshots, PR checks/review pages, and closing issues, including issues outside selected repositories. Branch links prefer observed commit SHAs and use the actual fork; an unavailable fork retains plain branch text. Profile URLs prefer GitHub's canonical URLs, including `/apps/` bot profiles. Missing source facts use `Unknown`, known empty collections use `None`, and incomplete reviewer coverage is explicit. Source table text is escaped, URLs are encoded, and only absolute HTTP(S) destinations become links. The upstream body remains unmodified; the UI owns its Markdown sanitization.
 
 A source read refreshes the snapshot, including cleared assignments, milestone, and reviewers, only when facts or source-owned Beads fields differ. `observed_at` stays unchanged when the facts are unchanged; it records when the stored snapshot was observed, not the latest successful poll. Use repository `last_success_at` in polling state for coverage freshness. A direct node read refreshes closure/PR evidence, description and derived labels while retaining last-known REST facts such as author, source labels, and comment count. All-state deltas can refresh later edits to closed items. Snapshot fields are observations, not a history or a guarantee that all fields were read simultaneously.
+
+Node-only refreshes recover GitHub labels from metadata, including known empty lists. Imports without this field fall back to existing `github:` labels until their next observation. Newly stored source text/labels populate when an item is next read; an unchanged issue absent from a delta is not backfilled just to populate metadata. Repository facts populate on the next successful repository pass. Unrelated top-level metadata, including local triage history, is preserved.
 
 ## Ownership
 
@@ -62,7 +65,13 @@ Closing a bead locally does not stop source-state verification. Changed closed i
 
 ## PR readiness
 
-Issue and PR imports start as Beads tasks distinguished by `type:issue` or `type:pr`. PRs with failing/error checks, unknown checks, conflicts, unknown mergeability, requested changes, or missing approval on a non-draft PR are `open`. Signal labels explain the reason. Other PRs are `in_progress`; pending checks are labeled `ci:pending` and draft PRs `draft:true`. Missing checks mean unknown, not passing. This deterministic policy is a triage aid, not proof that repository merge policy is satisfied.
+New issue and PR imports use native custom types `github_issue` and `pull_request`, retaining the `type:issue` and `type:pr` labels for source filtering. Existing imports retain their local issue types, including legacy `task`; repository epics retain `epic`. PRs with failing/error checks, unknown checks, conflicts, unknown mergeability, requested changes, or missing approval on a non-draft PR are `open`. Signal labels explain the reason. Other PRs are `in_progress`; pending checks are labeled `ci:pending` and draft PRs `draft:true`. Missing checks mean unknown, not passing. This deterministic policy is a triage aid, not proof that repository merge policy is satisfied.
+
+### Local workflow extensions
+
+The shared database registers `in_review:wip`, `backlog:active`, and `icebox:frozen` in `status.custom`, and the import types in `types.custom`, using the native [custom statuses and types](https://beads.gascity.com/reference/configuration#custom-statuses-and-types) mechanism. Registration appends only missing names, preserving other custom entries and categories already chosen by operators. It runs once per sync pass after the first repository's source reads/validation succeed, before creating imports; configuration writes count in `writes`. Compose startup also registers them before launching the UI. `gh-beads-runtime --configure-workflow` makes them available without GitHub access. Repeated registration performs no writes.
+
+These statuses are manual planning choices; automatic status policy remains open/in-progress/closed. `backlog` is eligible for `bd ready` subject to dependencies; `in_review` is work in progress and excluded from ready; `icebox` is frozen, excluded from ready and default lists. Existing categories take precedence if these names were already configured. Portfolio snapshots expose all three queues and include `in_review` in the in-progress queue. Manual statuses survive source refresh, while verified upstream closure still wins. Native claims change the status to `in_progress` as usual; use `hub:manual-status` to explicitly opt out of automatic selection.
 
 Additional factual filters use existing reads: PR `size:s` means fewer than 100 added+deleted lines, `size:m` means 100–499, and `size:l` means 500 or more; missing/invalid counts produce no size label. `author:bot` requires GitHub's explicit Bot author type. `links:closing-issue` means the PR has authoritative closing references, regardless of whether the targets are locally indexed. `resolution:merged` reflects verified upstream merging; `resolution:not-planned` reflects explicit upstream closure reason. Source changes/reopening remove obsolete filters. None of these labels change Beads priority or imply effort estimates. They add no API requests; canonical reviewer/fork/closing URLs extend the existing GraphQL selection.
 

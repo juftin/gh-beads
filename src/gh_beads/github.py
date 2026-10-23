@@ -81,6 +81,38 @@ def observed_at() -> str:
     return datetime.now(UTC).isoformat()
 
 
+def source_labels(bead: Json) -> list[str]:
+    """Read source labels from metadata, falling back for imports predating that field."""
+    source = ((bead.get("metadata") or {}).get("hub") or {}).get("github") or {}
+    if "labels" in source:
+        return list(source["labels"])
+    return [
+        unquote(label.removeprefix("github:"))
+        for label in bead.get("labels") or []
+        if label.startswith("github:")
+    ]
+
+
+def repository_metadata(repo: Json) -> Json:
+    """Select repository facts for both epic metadata and child source snapshots."""
+    return {
+        key: repo.get(key)
+        for key in (
+            "node_id",
+            "full_name",
+            "html_url",
+            "description",
+            "visibility",
+            "default_branch",
+            "language",
+            "stargazers_count",
+            "fork",
+            "archived",
+            "disabled",
+        )
+    }
+
+
 def source_metadata(row: Json, repo: Json) -> Json:
     """Select useful issue facts without copying profiles, emails, or source payloads wholesale."""
     author = row.get("user")
@@ -108,10 +140,7 @@ def source_metadata(row: Json, repo: Json) -> Json:
         "comment_count": row.get("comments"),
         "locked": row.get("locked"),
         "state_reason": row.get("state_reason"),
-        "repository": {
-            key: repo.get(key)
-            for key in ("visibility", "default_branch", "language", "stargazers_count", "fork")
-        },
+        "repository": repository_metadata(repo),
         "observed_at": observed_at(),
     }
 
@@ -385,11 +414,7 @@ class GitHub:
             node = details[node_id]
             node.update(
                 kind="pr",
-                labels=[
-                    unquote(label.removeprefix("github:"))
-                    for label in bead.get("labels") or []
-                    if label.startswith("github:")
-                ],
+                labels=source_labels(bead),
             )
             node["github"] = {
                 **bead["metadata"]["hub"].get("github", {}),
