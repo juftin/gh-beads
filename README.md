@@ -204,6 +204,8 @@ task deploy
 
 Check the initial import with `task sync-status` and `docker compose logs --tail=20 github-reconciler`. A healthy database does not establish GitHub freshness.
 
+Optionally deploy [DoltLab](docs/doltlab.md) alongside the hub with `task doltlab:setup` and `task doltlab:deploy`. The helper uses a checksum-pinned upstream installer on Linux AMD64, independent storage, and environment-supplied passwords. DoltLab provides a self-hosted database remote and web interface; publishing the Beads database is an explicit, separately authenticated step.
+
 ## Configuration
 
 Inject configuration into the environment used by Compose. Its default project is `gh-beads`, with persistent data in `gh-beads_data`.
@@ -363,7 +365,7 @@ The smoke workflow uses synthetic GitHub records with real Beads, Dolt, UI, and 
 
 ## Current scope and validation
 
-The current implementation has 151 passing offline tests, source/wheel build validation, native ARM64 macOS and AMD64 Linux embedded Dolt/concurrent polling/stdio/persistence validation, and linked-table Markdown/sanitization checks. A prior ARM64 Compose smoke pass covers installed commands, Beads lifecycle/graph behavior, UI WebSocket delivery, official MCP tools/resources over HTTP and stdio, authenticated remote SQL, and restart persistence. The latest embedded snapshot/review MCP checks and independent backup/restore validation pass on AMD64 Linux, including installed CLIs and zero-write restored sync replay. Updated Docker assertions (epics, linked descriptions, reviews, and independent volume restore) await execution because Docker is unavailable here. GitHub HTTP tests use synthetic responses. A credentialed multi-repository pilot, AMD64 image build, full browser interaction suite, and SQL/Compose restore execution remain unverified.
+The current implementation has 161 passing offline tests, source/wheel build validation, native ARM64 macOS and AMD64 Linux embedded Dolt/concurrent polling/stdio/persistence validation, and linked-table Markdown/sanitization checks. A prior ARM64 Compose smoke pass covers installed commands, Beads lifecycle/graph behavior, UI WebSocket delivery, official MCP tools/resources over HTTP and stdio, authenticated remote SQL, and restart persistence. The latest embedded snapshot/review MCP checks and independent backup/restore validation pass on AMD64 Linux, including installed CLIs and zero-write restored sync replay. Updated Docker assertions (epics, linked descriptions, reviews, and independent volume restore) await execution because Docker is unavailable here. GitHub HTTP tests use synthetic responses. A credentialed multi-repository pilot, AMD64 image build, full browser interaction suite, and SQL/Compose restore execution remain unverified.
 
 Current boundaries include polling rather than webhooks, one shared backlog rather than tenant isolation or HA, selected source snapshots rather than complete conversations/diffs/history, and human/agent categorization rather than automatic classification. There is no GitHub write-back, automatic freshness alerting, or migration from the earlier SQLite application.
 

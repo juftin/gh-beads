@@ -157,6 +157,8 @@ Host pointers have separate filesystem locks/progress, even when addressing the 
 
 ## Operate and triage
 
+For an optional self-hosted database remote, see the [DoltLab deployment guide](doltlab.md). `task doltlab:setup`, `doltlab:validate`, `doltlab:deploy`, `doltlab:status`, `doltlab:logs`, and `doltlab:down` manage its independent stack. Hub deployment and backup commands below continue to operate on the hub alone.
+
 ### Portfolio snapshot and saved decisions
 
 Start portfolio triage with one stored view:
