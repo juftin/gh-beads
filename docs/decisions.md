@@ -1,9 +1,5 @@
 # Design decisions
 
-## Optional DoltLab companion (2026-10-23)
-
-Deploy DoltLab through its official installer as an independent optional Compose project. Pin the downloaded release and checksum; use runtime environment passwords and separate storage. Keep the hub's SQL server as its working database, and require explicit Dolt remote authentication/publication to make commits available in DoltLab. Setup preserves completed assets because upstream regeneration rotates token keys. The helper starts the generated Compose services directly rather than invoking upstream `start.sh`, whose container cleanup targets default DoltLab container names belonging to other installations. See the [deployment guide](doltlab.md) and [validation checklist](checklist.md).
-
 ## Start a separate Beads implementation
 
 The standalone [gh-beads repository](https://github.com/juftin/gh-beads) contains the Beads-backed shared backlog and its clean implementation history. The earlier SQLite application and its history remain in [gh-maintainer](https://github.com/jufty-bot/gh-maintainer). No earlier application files or migration contracts carry into this design. This lets the new workflow be evaluated independently without claiming compatibility with earlier state.
