@@ -11,7 +11,7 @@ from datetime import UTC, datetime
 from email.utils import parsedate_to_datetime
 from threading import Lock
 from typing import Any
-from urllib.parse import unquote, urlencode
+from urllib.parse import urlencode
 
 from githubkit import GitHub as Client
 from githubkit import Response
@@ -377,20 +377,12 @@ class GitHub:
                 }
             )
             item["kind"] = kind
-            item["labels"] = [label["name"] for label in row["labels"]]
             item["github"] = {**source_metadata(row, repo), **item.get("github", {})}
             items.append(item)
             previous.pop(item["id"], None)
         for node_id, bead in previous.items():
             node = details[node_id]
-            node.update(
-                kind="pr",
-                labels=[
-                    unquote(label.removeprefix("github:"))
-                    for label in bead.get("labels") or []
-                    if label.startswith("github:")
-                ],
-            )
+            node["kind"] = "pr"
             node["github"] = {
                 **bead["metadata"]["hub"].get("github", {}),
                 **node["github"],

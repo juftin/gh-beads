@@ -138,12 +138,58 @@ def test_repeat_sync_preserves_local_triage_and_updates_source() -> None:
         "category:bug-fix",
         "repo:example/orbit",
         "type:pr",
-        "github:new",
         "ci:passing",
         "review:approved",
         "size:s",
     }
     assert local["metadata"]["other"] == {"keep": True}
+
+
+@pytest.mark.parametrize("kind", ["issue", "pr"])
+def test_upstream_labels_are_not_imported(kind: str) -> None:
+    """GitHub labels cannot create encoded Beads labels or survive in source metadata."""
+    row = item(kind)
+    row["labels"] = ["help wanted", "label,with,commas", "category:upstream", "100%"]
+    row["github"]["labels"] = row["labels"]
+    source, beads = FixtureGitHub([row]), MemoryBeads()
+    assert sync.reconcile(source, beads, "user:@me")["status"] == "complete"
+    local = beads.rows["hub-1"]
+    assert not any(label.startswith("github:") for label in local["labels"])
+    assert "category:upstream" not in local["labels"]
+    assert "labels" not in local["metadata"]["hub"]["github"]
+    assert {"repo:example/orbit", f"type:{kind}"} <= set(local["labels"])
+    row["labels"] = ["changed upstream label"]
+    row["github"]["labels"] = row["labels"]
+    assert sync.reconcile(source, beads, "user:@me")["writes"] == 0
+
+
+@pytest.mark.parametrize("source_state", ["OPEN", "CLOSED"])
+def test_legacy_source_labels_are_pruned_with_empty_delta(source_state: str) -> None:
+    """Clean selected imports without source changes, retaining local decisions and facts."""
+    row = dict(item(), state=source_state)
+    source, beads, state = FixtureGitHub([row]), MemoryBeads(), SyncState()
+    sync.reconcile(source, beads, "user:@me", state)
+    local = beads.rows["hub-1"]
+    local["labels"].extend(["github:help%20wanted", "github:old,label", "category:keep"])
+    local["metadata"]["hub"]["github"]["labels"] = ["help wanted", "old,label"]
+    local["metadata"]["custom"] = {"labels": ["local decision"]}
+    local.update(notes="Keep this", priority=1, assignee="maintainer")
+    source.rows = []
+    source.node_calls.clear()
+    source.failed_repos.add("R_1")
+    assert sync.reconcile(source, beads, "user:@me", state)["status"] == "partial"
+    assert "github:help%20wanted" in local["labels"]
+    source.failed_repos.clear()
+    result = sync.reconcile(source, beads, "user:@me", state)
+    assert result["status"] == "complete" and result["writes"] == 1
+    assert not source.node_calls
+    assert not any(label.startswith("github:") for label in local["labels"])
+    assert "category:keep" in local["labels"]
+    assert "labels" not in local["metadata"]["hub"]["github"]
+    assert local["metadata"]["hub"]["github"]["author"]["login"] == "synthetic-author"
+    assert local["metadata"]["custom"] == {"labels": ["local decision"]}
+    assert (local["notes"], local["priority"], local["assignee"]) == ("Keep this", 1, "maintainer")
+    assert sync.reconcile(source, beads, "user:@me", state)["writes"] == 0
 
 
 def test_manual_status_survives_sync() -> None:

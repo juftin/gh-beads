@@ -1,6 +1,6 @@
 """Reconcile credential-visible GitHub issues and PRs into a shared Beads backlog.
 
-GitHub owns source text, source labels, and closure. Humans own priority, assignee,
+GitHub owns source text and closure. Humans own priority, assignee,
 notes, categories, and explicit status overrides. A filesystem lock serializes hub
 reconcilers; all database access goes through bd, never direct SQL writes.
 """
@@ -19,7 +19,6 @@ import sys
 import time
 from pathlib import Path
 from typing import Any
-from urllib.parse import quote, unquote
 
 from gh_beads.description import describe
 from gh_beads.github import GitHub, RateLimited
@@ -41,7 +40,7 @@ MANAGED_PREFIXES = (
     "links:",
     "resolution:",
 )
-"""Label namespaces owned exclusively by reconciliation."""
+"""Label namespaces owned exclusively by reconciliation; github: is retired and pruned."""
 
 
 def command(args: list[str]) -> Any:
@@ -92,7 +91,6 @@ def repository_scopes(repositories: list[str] | None) -> str:
 def evaluate(item: Json) -> tuple[str, set[str]]:
     """Derive source-owned signals; uncertain CI or mergeability remains actionable."""
     labels = {f"repo:{item['repository']['nameWithOwner']}", f"type:{item['kind']}"}
-    labels.update(f"github:{quote(label, safe='')}" for label in item["labels"])
     source = item.get("github") or {}
     if (source.get("author") or {}).get("type") == "Bot":
         labels.add("author:bot")
@@ -153,8 +151,9 @@ def csv_value(value: str) -> str:
 
 
 def snapshot_metadata(source: Json, previous: Json) -> Json:
-    """Retain a stored observation time when the source facts have not changed."""
+    """Omit source labels and retain the observation time when stored facts are unchanged."""
     source = dict(source)
+    source.pop("labels", None)
     if {key: value for key, value in source.items() if key != "observed_at"} == {
         key: value for key, value in previous.items() if key != "observed_at"
     }:
@@ -188,6 +187,23 @@ class Beads:
         """Merge only the hub metadata key, preserving metadata owned by local tools."""
         self.call("update", bead["id"], "--metadata", json.dumps({"hub": hub}))
         bead.setdefault("metadata", {})["hub"] = hub
+
+    def prune_source_labels(self, bead: Json) -> None:
+        """Remove retired GitHub label copies, including imports absent from a delta."""
+        labels = [label for label in bead.get("labels") or [] if label.startswith("github:")]
+        hub = dict((bead.get("metadata") or {}).get("hub") or {})
+        source = dict(hub.get("github") or {})
+        args = ["update", bead["id"]]
+        for label in sorted(labels):
+            args.extend(["--remove-label", csv_value(label)])
+        if "labels" in source:
+            source.pop("labels")
+            hub["github"] = source
+            args.extend(["--metadata", json.dumps({"hub": hub})])
+        if len(args) > 2:
+            self.call(*args)
+            bead["labels"] = [label for label in bead.get("labels") or [] if label not in labels]
+            bead.setdefault("metadata", {})["hub"] = hub
 
     def repository(self, repo: Json, bead: Json | None) -> Json:
         """Maintain a repository epic by stable node identity, retaining local workflow fields."""
@@ -249,11 +265,6 @@ class Beads:
             {
                 **item,
                 "github": {**bead["metadata"]["hub"].get("github", {}), **item.get("github", {})},
-                "labels": [
-                    unquote(label.removeprefix("github:"))
-                    for label in bead.get("labels") or []
-                    if label.startswith("github:")
-                ],
             },
             bead,
         )
@@ -446,7 +457,7 @@ def reconcile(
                 }
                 for node_id, item in github.nodes(list(missing)).items():
                     bead = missing[node_id]
-                    item.update(kind=bead["metadata"]["hub"]["kind"], labels=[])
+                    item.update(kind=bead["metadata"]["hub"]["kind"])
                     validate_item(item)
                     if item["state"] in {"CLOSED", "MERGED"}:
                         closing.append((item, bead))
@@ -459,6 +470,7 @@ def reconcile(
             by_ref[epic["external_ref"]] = epic
             # Migrate existing children even when absent from an incremental delta.
             for bead in local:
+                beads.prune_source_labels(bead)
                 beads.parent(bead, epic)
             for item in items:
                 previous = by_node.get(item["id"]) or by_ref.get(source_ref(item))

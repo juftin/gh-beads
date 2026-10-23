@@ -22,7 +22,7 @@ The original draft used GraphQL search. GitHub search has a result cap and is no
 
 ## Keep GitHub and local workflow ownership explicit
 
-Source labels are namespaced and escaped. The hub updates its own label namespaces and metadata key while leaving local classification and triage intact. It uses source node identity for rename continuity. Upstream closure requires an explicit state read; a scope change, permission failure, or missing record does not imply closure. Claims and status overrides survive source refresh. See the [architecture contract](architecture.md) for field ownership and readiness policy.
+GitHub label names are not copied into Beads labels or metadata; legacy percent-encoded `github:` copies are pruned during successful repository passes. The hub updates its own signal-label namespaces and metadata key while leaving local classification and triage intact. It uses source node identity for rename continuity. Upstream closure requires an explicit state read; a scope change, permission failure, or missing record does not imply closure. Claims and status overrides survive source refresh. See the [architecture contract](architecture.md) for field ownership and readiness policy.
 
 ## Use GitHubKit for Python source access
 

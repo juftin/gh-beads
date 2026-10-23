@@ -24,7 +24,7 @@ Sync owns each imported issue/PR's parent and repairs it with `bd update --paren
 
 ### Source metadata
 
-`metadata.hub.github` holds selected source facts, distinct from local Beads fields:
+`metadata.hub.github` holds selected source facts, distinct from local Beads fields. GitHub label names are excluded from both metadata and Beads labels; only hub-derived signal labels and local classifications are retained.
 
 | Fields | Content |
 | --- | --- |
@@ -41,14 +41,16 @@ Requested reviewers include the first 100 entries, with `requested_reviewers_tot
 
 The description starts with a deterministic attention summary derived from existing source signals, followed by a two-column Markdown table, two explicit line breaks (`<br><br>`) for visible spacing, a separator, and the original GitHub body verbatim. Links cover the source item, repository, people/teams, milestone, branch snapshots, PR checks/review pages, and closing issues, including issues outside selected repositories. Branch links prefer observed commit SHAs and use the actual fork; an unavailable fork retains plain branch text. Profile URLs prefer GitHub's canonical URLs, including `/apps/` bot profiles. Missing source facts use `Unknown`, known empty collections use `None`, and incomplete reviewer coverage is explicit. Source table text is escaped, URLs are encoded, and only absolute HTTP(S) destinations become links. The upstream body remains unmodified; the UI owns its Markdown sanitization.
 
-A source read refreshes the snapshot, including cleared assignments, milestone, and reviewers, only when facts or source-owned Beads fields differ. `observed_at` stays unchanged when the facts are unchanged; it records when the stored snapshot was observed, not the latest successful poll. Use repository `last_success_at` in polling state for coverage freshness. A direct node read refreshes closure/PR evidence, description and derived labels while retaining last-known REST facts such as author, source labels, and comment count. All-state deltas can refresh later edits to closed items. Snapshot fields are observations, not a history or a guarantee that all fields were read simultaneously.
+A source read refreshes the snapshot, including cleared assignments, milestone, and reviewers, only when facts or source-owned Beads fields differ. `observed_at` stays unchanged when the facts are unchanged; it records when the stored snapshot was observed, not the latest successful poll. Use repository `last_success_at` in polling state for coverage freshness. A direct node read refreshes closure/PR evidence, description and derived labels while retaining last-known REST facts such as author and comment count. All-state deltas can refresh later edits to closed items. Snapshot fields are observations, not a history or a guarantee that all fields were read simultaneously.
+
+After a selected repository's reads/validation succeed, sync prunes retired `github:` labels and `metadata.hub.github.labels` from its existing imported work, including closed items and empty-delta imports. Other metadata, source facts, and local labels are preserved; cleanup does not advance the stored observation time. The retired prefix remains sync-owned only for removal. Failed source reads and excluded repositories perform no cleanup; a cleanup write failure prevents the checkpoint from advancing and is retried. New snapshots discard source-label metadata as well.
 
 ## Ownership
 
 | Field | Owner / update behavior |
 | --- | --- |
 | Title, description, external reference | GitHub snapshot, refreshed by sync |
-| `repo:`, `type:`, `github:`, `ci:`, `conflict:`, `review:`, `draft:`, `size:`, `author:`, `links:`, `resolution:` labels | Sync adds/removes individual labels |
+| `repo:`, `type:`, `ci:`, `conflict:`, `review:`, `draft:`, `size:`, `author:`, `links:`, `resolution:` labels | Sync adds/removes individual labels; retired `github:` copies are removed |
 | Other labels, priority, notes, comments, assignee, local issue type | Local workflow, retained |
 | `metadata.hub` | Reconciler; `--metadata` merges it without replacing unrelated metadata |
 | Status | Automatic for unclaimed items still matching the last sync-owned status; claims and manual overrides are retained |
@@ -72,7 +74,7 @@ For an indexed closing issue, `bd dep add ISSUE_ID PR_ID` means the issue depend
 
 `src/gh_beads/state.py` owns `.github-sync-state.json` in the selected workspace: the local repository by default, or `/var/lib/beads` on Compose's shared volume. A missing file bootstraps with a full open inventory. Each subsequent pass queries REST issues with `state=all&since=CHECKPOINT_MINUS_300_SECONDS`, including PRs and terminal updates. The checkpoint is the local wall-clock time immediately before reading that repository, never the largest returned source date. Timestamp overlap makes repeats harmless. Malformed state fails visibly rather than resetting coverage silently; clock rollback forces a full repair.
 
-Every pass also refreshes all known source-open PRs by node ID, independently of REST update timestamps. GraphQL supplies current body/title, latest commit rollup, review decision, mergeability, draft flag, and all closing references. If a PR is absent from the REST delta, its last-known REST metadata and source labels are retained. This avoids assuming that CI, reviews, and mergeability can be inferred from an issue update timestamp.
+Every pass also refreshes all known source-open PRs by node ID, independently of REST update timestamps. GraphQL supplies current body/title, latest commit rollup, review decision, mergeability, draft flag, and all closing references. If a PR is absent from the REST delta, its last-known REST metadata is retained. This avoids assuming that CI, reviews, and mergeability can be inferred from an issue update timestamp.
 
 Once an hour, on repository rename, or with `--full`, a full open inventory repairs coverage and verifies absent imported items by explicit node state. When a checkpoint exists, repairs also read the all-state delta since that checkpoint; the open inventory cannot replace coverage of terminal updates. Both collections finish before writes, and rows are deduplicated by node ID before PR detail reads, with the later delta observation taking precedence. A failed page in either collection retains the previous checkpoint. Clock rollback rewinds the delta to five minutes before the current time while requesting a full repair.
 

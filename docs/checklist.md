@@ -1,5 +1,7 @@
 # Implementation and validation checklist
 
+- [x] Stop copying GitHub label names into Beads labels or source metadata. Successful selected repository passes remove retired `github:` labels and old `metadata.hub.github.labels`, including closed work absent from deltas, while retaining local decisions and hub signals. Verify ignored names with spaces/commas/percent signs, scoped cleanup, failed-read isolation, cleanup-write replay, and zero-write repeats. `task fix`, `task lint`, `task check`, and `task test` pass with 151 tests; native Beads 1.3.1 `task smoke-local` verifies actual label/metadata removal and local-field preservation. Docker smoke remains unavailable without Docker.
+
 - [x] Confirm that GitHub issues and PRs first import as native `task` items in the existing lifecycle check. Add two explicit line breaks after the generated summary table, before the separator and verbatim source body. `task lint`, `task check`, and `task test` pass with 146 tests; the beads-ui 0.12.6 Markdown/sanitizer pipeline (marked 17.0.1 and DOMPurify 3.3.0 under jsdom) retains both breaks and the source body. Full browser layout remains unverified.
 
 - [x] Revert `a6b39d6` (expanded metadata and native custom workflow types/statuses) because pinned beads-ui 0.12.6 lacks complete visualization/editing/filter/board support. Preserve the prior source metadata and description behavior; record the decision and [upstream compatibility watch](roadmap.md#beads-ui-compatibility-watch).

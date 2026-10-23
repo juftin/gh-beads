@@ -56,6 +56,37 @@ def test_bootstrap_then_delta_survives_restart(tmp_path: Path) -> None:
     assert not path.with_suffix(".tmp").exists()
 
 
+def test_legacy_label_cleanup_replays_and_respects_selection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Failed cleanup cannot advance a cursor or modify an excluded repository."""
+    other = repository("example/other", "R_2")
+    source = FixtureGitHub([item(), item(repo=other)], [repository(), other])
+    beads, state = MemoryBeads(), SyncState()
+    sync.reconcile(source, beads, "user:@me", state)
+    for bead_id in ("hub-1", "hub-2"):
+        beads.rows[bead_id]["labels"].append("github:help%20wanted")
+    checkpoint = state.data["repositories"]["R_1"]["checkpoint"]
+    source.rows, source.repos = [], [repository()]
+    original = beads.call
+
+    def fail_cleanup(*args: str) -> Any:
+        if "--remove-label" in args:
+            raise RuntimeError("Synthetic label cleanup failure")
+        return original(*args)
+
+    monkeypatch.setattr(beads, "call", fail_cleanup)
+    result = sync.reconcile(source, beads, "repo:example/orbit", state)
+    assert result["status"] == "partial"
+    assert state.data["repositories"]["R_1"]["checkpoint"] == checkpoint
+    assert "github:help%20wanted" in beads.rows["hub-1"]["labels"]
+    monkeypatch.setattr(beads, "call", original)
+    result = sync.reconcile(source, beads, "repo:example/orbit", state)
+    assert result["status"] == "complete" and result["writes"] == 1
+    assert "github:help%20wanted" not in beads.rows["hub-1"]["labels"]
+    assert "github:help%20wanted" in beads.rows["hub-2"]["labels"]
+
+
 @pytest.mark.parametrize("failure", ["source", "write", "dependency"])
 def test_failures_replay_without_advancing_checkpoint(
     tmp_path: Path,

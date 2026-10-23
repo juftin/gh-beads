@@ -67,7 +67,7 @@ The hub starts with a full open-item inventory, then polls changed issues/PRs in
 | GitHub change | Next successful poll |
 | --- | --- |
 | New or reopened open issue/PR | Import or refresh the same stable bead |
-| Edited title, labels, assignments, milestone | Refresh source-owned text and metadata |
+| Edited title, assignments, milestone | Refresh source-owned text and metadata |
 | New commits, CI results, or review decisions on an open PR | Refresh PR evidence, signal labels, and automatic readiness |
 | Imported issue closed or PR closed/merged | Verify state directly, then close the bead and save closure evidence |
 | Closed/referenced PR no longer blocks an issue | Closed blockers cease blocking through Beads; removed references prune hub-owned edges |
@@ -216,7 +216,7 @@ bd update <id> --claim
 bd blocked --json
 ```
 
-GitHub labels appear as `github:<percent-encoded-name>` to avoid collisions with local categories and comma-based CLI filters. For example, `bug` becomes `github:bug` and `help wanted` becomes `github:help%20wanted`. The reconciler owns source title/description; put durable reasoning in Beads notes and comments. Beads priority and issue/PR type are local choices (imports start as `task`, priority 2); repository containers stay `epic`.
+GitHub label names are not imported into Beads labels or metadata. Legacy `github:` labels and `metadata.hub.github.labels` are removed from existing imported issues/PRs during the next successful pass for their repository, including closed work and items absent from a delta. Selected syncs leave excluded repositories untouched; a failed source read performs no cleanup. This does not require a full source refresh or modify labels in GitHub. Other local labels, local metadata, and triage history are preserved. The reconciler owns source title/description; put durable reasoning in Beads notes and comments. Beads priority and issue/PR type are local choices (imports start as `task`, priority 2); repository containers stay `epic`.
 
 Every imported issue/PR also carries source facts under `metadata.hub.github`: author, upstream assignees, milestone, dates, comment count, repository details, and PR branch SHAs, size, reviewer requests, merge/review/CI state. Inspect these with `bd show <id> --json`. Descriptions show an attention summary and a linked two-column table, followed by the unchanged GitHub body. Links open the source item/repository, author and assignees, milestone, requested reviewers/teams, source branch snapshots (including forks), PR checks/review pages, and closing issues. Missing forks retain plain branch text; incomplete reviewer lists are marked. GitHub assignees do not claim the bead. Repository grouping remains the `repo:OWNER/REPO` label, with stable repository identity in `metadata.hub.repo_id`.
 

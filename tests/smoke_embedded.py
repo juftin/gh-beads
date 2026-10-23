@@ -21,7 +21,27 @@ from gh_beads.sync import Beads, run_sync
 
 async def check_clients(source: FixtureGitHub, beads: Beads) -> None:
     """Overlap real MCP reads with poller writes, then reopen MCP to verify durable state."""
-    issue_id = next(row["id"] for row in beads.items() if row["metadata"]["hub"]["kind"] == "issue")
+    issue = next(row for row in beads.items() if row["metadata"]["hub"]["kind"] == "issue")
+    issue_id = issue["id"]
+    hub = issue["metadata"]["hub"]
+    hub["github"]["labels"] = ["help wanted"]
+    beads.call(
+        "update",
+        issue_id,
+        "--add-label",
+        "github:help%20wanted",
+        "--add-label",
+        "category:keep",
+        "--metadata",
+        json.dumps({"hub": hub, "local": {"labels": ["keep this"]}}),
+    )
+    result = run_sync()
+    assert result["status"] == "complete" and result["writes"] == 1, result
+    issue = next(row for row in beads.items() if row["id"] == issue_id)
+    assert "labels" not in issue["metadata"]["hub"]["github"]
+    assert "category:keep" in issue["labels"]
+    assert issue["metadata"]["local"] == {"labels": ["keep this"]}
+    assert not any(label.startswith("github:") for row in beads.items() for label in row["labels"])
     beads.call("update", issue_id, "--priority", "1", "--notes", "Synthetic local reasoning")
     for session in range(2):
         transport = StdioTransport(command="gh-beads-mcp", args=[], env=dict(os.environ))

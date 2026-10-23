@@ -297,6 +297,7 @@ def test_team_and_unavailable_reviewer_metadata() -> None:
 def test_delta_uses_all_states_and_refreshes_unchanged_pr() -> None:
     """An empty REST delta still reads live PR signals and retains known common metadata."""
     pr = item("pr")
+    pr.pop("labels")  # GraphQL does not request source labels.
     bead = {
         "labels": ["github:help%20wanted"],
         "metadata": {
@@ -324,7 +325,7 @@ def test_delta_uses_all_states_and_refreshes_unchanged_pr() -> None:
         rows = github.items(repository(), since=since, prs=[bead])
     assert requests == ["GET", "POST"]
     assert len(rows) == 1 and rows[0]["kind"] == "pr"
-    assert rows[0]["labels"] == ["help wanted"]
+    assert "labels" not in rows[0]
     assert rows[0]["github"]["author"]["login"] == "synthetic-author"
     assert rows[0]["github"]["pull_request"]["review_decision"] == "CHANGES_REQUESTED"
 
@@ -423,13 +424,13 @@ def test_repair_deduplicates_prs_before_detail_reads() -> None:
     node_reads = 0
 
     def response(request: httpx.Request) -> httpx.Response:
-        """Return a stale label in the open scan and its newer value in the following delta."""
+        """Return a stale comment count in the open scan and a newer one in the delta."""
         nonlocal node_reads
         if request.method == "POST":
             node_reads += 1
             return httpx.Response(200, json={"data": {"node": pr}})
-        label = "new" if request.url.params["state"] == "all" else "old"
-        return httpx.Response(200, json=[dict(row, labels=[{"name": label}])])
+        comments = 5 if request.url.params["state"] == "all" else 4
+        return httpx.Response(200, json=[dict(row, comments=comments)])
 
     github = source(response)
     with github.client:
@@ -439,7 +440,7 @@ def test_repair_deduplicates_prs_before_detail_reads() -> None:
             full=True,
             prs=[{"metadata": {"hub": {"node_id": pr["id"]}}}],
         )
-    assert len(rows) == 1 and rows[0]["labels"] == ["new"]
+    assert len(rows) == 1 and rows[0]["github"]["comment_count"] == 5
     assert node_reads == 1
 
 

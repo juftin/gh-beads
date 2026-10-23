@@ -88,14 +88,14 @@ Stable GitHub node IDs are recorded in `metadata.hub`, alongside repository iden
 
 Existing imports gain their repository parent on the next successful sync, including closed items absent from a delta. Sync maintains epic type and child parenting. Epic status and local planning fields remain local; empty or excluded repositories are not automatically closed.
 
-GitHub labels use the `github:` namespace and percent-encoded names: `bug` becomes `github:bug`, and `help wanted` becomes `github:help%20wanted`. Local classifications use other labels, such as `category:documentation` or `category:dependency-upgrade`.
+GitHub label names are not copied into Beads labels or metadata. Use local classifications such as `category:documentation` or `category:dependency-upgrade`. The next successful repository pass removes legacy `github:` copies and any old source-label metadata, including from closed items absent from a delta; other local labels and metadata remain intact.
 
 ### Source facts and local decisions
 
 | Information | Owner and update behavior |
 | --- | --- |
 | Title, description, source link | Refreshed from GitHub; descriptions include an attention summary, linked table, and original body |
-| Repository, source labels, PR signals | Sync-owned `repo:`, `type:`, `github:`, `ci:`, `conflict:`, `review:`, `draft:`, `size:`, `author:`, `links:`, and `resolution:` labels |
+| Repository and PR signals | Sync-owned `repo:`, `type:`, `ci:`, `conflict:`, `review:`, `draft:`, `size:`, `author:`, `links:`, and `resolution:` labels; retired `github:` copies are removed |
 | GitHub metadata | Refreshed under `metadata.hub.github` |
 | Priority, Beads assignee, notes, comments, local labels and issue/PR type | Local workflow; retained by sync |
 | Repository epic type and imported issue/PR parent | Maintained by sync |
@@ -363,7 +363,7 @@ The smoke workflow uses synthetic GitHub records with real Beads, Dolt, UI, and 
 
 ## Current scope and validation
 
-The current implementation has 146 passing offline tests, source/wheel build validation, native ARM64 macOS and AMD64 Linux embedded Dolt/concurrent polling/stdio/persistence validation, and linked-table Markdown/sanitization checks. A prior ARM64 Compose smoke pass covers installed commands, Beads lifecycle/graph behavior, UI WebSocket delivery, official MCP tools/resources over HTTP and stdio, authenticated remote SQL, and restart persistence. The latest embedded snapshot/review MCP checks and independent backup/restore validation pass on AMD64 Linux, including installed CLIs and zero-write restored sync replay. Updated Docker assertions (epics, linked descriptions, reviews, and independent volume restore) await execution because Docker is unavailable here. GitHub HTTP tests use synthetic responses. A credentialed multi-repository pilot, AMD64 image build, full browser interaction suite, and SQL/Compose restore execution remain unverified.
+The current implementation has 151 passing offline tests, source/wheel build validation, native ARM64 macOS and AMD64 Linux embedded Dolt/concurrent polling/stdio/persistence validation, and linked-table Markdown/sanitization checks. A prior ARM64 Compose smoke pass covers installed commands, Beads lifecycle/graph behavior, UI WebSocket delivery, official MCP tools/resources over HTTP and stdio, authenticated remote SQL, and restart persistence. The latest embedded snapshot/review MCP checks and independent backup/restore validation pass on AMD64 Linux, including installed CLIs and zero-write restored sync replay. Updated Docker assertions (epics, linked descriptions, reviews, and independent volume restore) await execution because Docker is unavailable here. GitHub HTTP tests use synthetic responses. A credentialed multi-repository pilot, AMD64 image build, full browser interaction suite, and SQL/Compose restore execution remain unverified.
 
 Current boundaries include polling rather than webhooks, one shared backlog rather than tenant isolation or HA, selected source snapshots rather than complete conversations/diffs/history, and human/agent categorization rather than automatic classification. There is no GitHub write-back, automatic freshness alerting, or migration from the earlier SQLite application.
 

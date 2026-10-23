@@ -90,7 +90,8 @@ def main() -> None:
     assert snapshot["assignees"] == [] and snapshot["milestone"] is None
     assert snapshot["comment_count"] == 5
     assert snapshot["pull_request"]["requested_reviewers"] == []
-    assert "category:bug-fix" in local["labels"] and "github:new-label" in local["labels"]
+    assert "category:bug-fix" in local["labels"]
+    assert not any(label.startswith("github:") for label in local["labels"])
     assert "review:needed" not in local["labels"]
     source.rows = [issue]
     merged = dict(pr, state="MERGED", mergedAt="2026-10-21T12:00:00Z")
