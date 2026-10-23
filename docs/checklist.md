@@ -1,5 +1,7 @@
 # Implementation and validation checklist
 
+- [x] Confirm that GitHub issues and PRs first import as native `task` items in the existing lifecycle check. Add two explicit line breaks after the generated summary table, before the separator and verbatim source body. `task lint`, `task check`, and `task test` pass with 146 tests; the beads-ui 0.12.6 Markdown/sanitizer pipeline (marked 17.0.1 and DOMPurify 3.3.0 under jsdom) retains both breaks and the source body. Full browser layout remains unverified.
+
 - [x] Revert `a6b39d6` (expanded metadata and native custom workflow types/statuses) because pinned beads-ui 0.12.6 lacks complete visualization/editing/filter/board support. Preserve the prior source metadata and description behavior; record the decision and [upstream compatibility watch](roadmap.md#beads-ui-compatibility-watch).
 - [x] Revert validation: `task lint`, `task check`, and `task test` pass with 146 tests; native Beads 1.3.1 `task smoke-local` passes. Runtime, scripts, and tests match the pre-extension implementation. `task smoke` was attempted and stops at `docker: command not found`.
 - [ ] Review beads-ui releases for configured custom status/type discovery, labels, editing, filters, category-aware board placement, frozen-item access, and namespaced metadata visualization. Validate in a real browser before reintroducing `github_issue`, `pull_request`, `in_review`, `backlog`, `icebox`, or the deferred metadata expansions.

@@ -162,4 +162,4 @@ def describe(item: dict[str, Any], labels: set[str]) -> str:
     table = "\n".join(
         ["| Field | Value |", "| --- | --- |", *[f"| {field} | {value} |" for field, value in rows]]
     )
-    return f"**{summary}**\n\n{table}\n\n---\n\n{item.get('body') or ''}"
+    return f"**{summary}**\n\n{table}\n\n<br><br>\n\n---\n\n{item.get('body') or ''}"

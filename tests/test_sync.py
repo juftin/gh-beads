@@ -204,6 +204,7 @@ def test_polling_converges_across_item_lifecycle() -> None:
     source.states = {row["id"]: copy.deepcopy(row) for row in source.rows}
     assert sync.reconcile(source, beads, "user:@me")["status"] == "complete"
     issue_bead, pr_bead = beads.rows["hub-1"], beads.rows["hub-2"]
+    assert issue_bead["issue_type"] == pr_bead["issue_type"] == "task"
     assert len(beads.rows) == 3 and beads.edges == {("hub-1", "hub-2")}
     assert pr_bead["status"] == "open"
     pr["reviewDecision"] = "APPROVED"
