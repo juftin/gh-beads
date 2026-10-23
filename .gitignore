@@ -4,6 +4,7 @@ __pycache__/
 .ruff_cache/
 .mypy_cache/
 .beads/
+.doltlab/
 .github-sync-state.json
 .github-sync-state.tmp
 .github-sync.lock

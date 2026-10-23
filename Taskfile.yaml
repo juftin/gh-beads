@@ -23,7 +23,7 @@ tasks:
     cmds:
       - uv run --locked ruff check .
       - uv run --locked ruff format --check .
-      - bash -n scripts/*.sh
+      - for script in scripts/*.sh; do bash -n "$script" || exit; done
   check:
     desc: Check Python types
     cmds: [uv run --locked mypy]
@@ -76,3 +76,21 @@ tasks:
     desc: Show per-repository sync checkpoints, successes, failures, and rate cooldown
     cmds:
       - docker compose exec -T github-reconciler gh-beads-sync --status
+  doltlab:setup:
+    desc: Download checksum-pinned DoltLab and generate its optional standalone stack
+    cmds: [bash scripts/doltlab.sh setup]
+  doltlab:validate:
+    desc: Validate optional DoltLab Compose configuration without printing passwords
+    cmds: [bash scripts/doltlab.sh validate]
+  doltlab:deploy:
+    desc: Start the optional DoltLab stack independently of the hub
+    cmds: [bash scripts/doltlab.sh deploy]
+  doltlab:status:
+    desc: Show optional DoltLab services
+    cmds: [bash scripts/doltlab.sh status]
+  doltlab:logs:
+    desc: Follow optional DoltLab logs
+    cmds: ['bash scripts/doltlab.sh logs {{.CLI_ARGS}}']
+  doltlab:down:
+    desc: Stop optional DoltLab while retaining its volumes and configuration
+    cmds: [bash scripts/doltlab.sh down]
