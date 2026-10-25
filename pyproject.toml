@@ -19,6 +19,7 @@ gh-beads-mcp = "gh_beads.mcp:main"
 gh-beads-runtime = "gh_beads.runtime:main"
 gh-beads-snapshot = "gh_beads.snapshot:main"
 gh-beads-triage = "gh_beads.triage:main"
+gh-beads-skill = "gh_beads.skill:main"
 
 [build-system]
 requires = ["uv_build>=0.12.1,<0.13"]

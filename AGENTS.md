@@ -67,6 +67,17 @@ Finish with a concise portfolio summary, the recommended next actions, local cha
 
 If CLI access is unavailable, start with `portfolio_snapshot`, then `record_triage` to save decisions. Use the official Beads tools and `beads://quickstart`; discover schemas rather than guessing them. `trigger_github_sync({})` refreshes configured scopes; `{"repositories": ["owner/api"]}` selects a pass. Inspect `complete`, `partial`, or `busy`. See [local stdio](docs/local.md#3-connect-a-stdio-mcp-client) or [Compose HTTP](README.md#mcp). Keep Compose reconciliation inside Compose; a host SQL pointer has separate locks/checkpoints.
 
+## Maintainer stewardship skill
+
+For detailed open-source triage, dependency reviews, external contribution workflows, bug report reproduction loops, and action receipts, follow the `oss-steward` skill:
+- Workspace location: [.agents/skills/oss-steward/SKILL.md](.agents/skills/oss-steward/SKILL.md) and [skills/oss-steward/SKILL.md](skills/oss-steward/SKILL.md).
+- To install the skill into any project or agent platform:
+  ```sh
+  uv run --locked gh-beads-skill install [--target workspace|global|claude|cursor|copilot|all]
+  ```
+- Or using the shell helper: `bash scripts/install-skill.sh [TARGET]`
+- For MCP agents: call `install_stewardship_skill`, read `skills://oss-steward/SKILL.md`, or invoke the `oss_steward` prompt.
+
 ## If changing this project
 
 Read [architecture](docs/architecture.md) and [usage](docs/usage.md) first. Application code is in `src/gh_beads`, shell helpers in `scripts/`, and checks in `tests/`. Use the locked environment through [Task](Taskfile.yaml): `task fix`, `task lint`, `task check`, `task test`; add `task smoke` for runtime bd/entrypoint/transport changes and `task package` for packaging changes. Update [roadmap](docs/roadmap.md) and [checklist](docs/checklist.md) when capabilities or validation change. Follow the user's authorization for commits and pushes.

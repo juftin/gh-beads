@@ -7,10 +7,10 @@ GitHub supplies source facts; Beads stores local triage and workflow decisions. 
 ## Contents
 
 - [What it does](#what-it-does)
+- [Maintain your first repository](#maintain-your-first-repository)
 - [Architecture](#architecture)
 - [Work items and metadata](#work-items-and-metadata)
 - [How synchronization works](#how-synchronization-works)
-- [Quick start](#quick-start)
 - [Local Dolt and stdio](#local-dolt-and-stdio)
 - [Docker Compose deployment](#docker-compose-deployment)
 - [Configuration](#configuration)
@@ -29,6 +29,152 @@ GitHub supplies source facts; Beads stores local triage and workflow decisions. 
 - Preserves local priorities, claims, notes, comments, categories, and unrelated metadata while refreshing source-owned fields.
 
 For example, an issue and its proposed fix can both appear in the backlog. If GitHub recognizes the PR as closing that issue, the issue depends on the PR. Work on failing checks or requested changes through the PR bead while Beads keeps the issue out of the ready queue.
+
+<a id="quick-start"></a>
+## Maintain your first repository
+
+Follow this walkthrough to bring your first GitHub repository into a local Beads backlog, inspect its state, triage an item, execute an authorized external action with a companion tool, and set up continuous maintenance with MCP and the stewardship skill.
+
+### 1. Prerequisites and installation
+
+You need:
+- **Python 3.11+** and **[uv](https://docs.astral.sh/uv/)**.
+- **Native Beads `bd` 1.3.1** with embedded Dolt support:
+  - Download the precompiled `bd` 1.3.1 binary for your platform from the [Beads releases](https://github.com/gastownhall/beads/releases/tag/v1.3.1) and place it on your `PATH` (e.g., in `~/.local/bin/bd` or `/usr/local/bin/bd`).
+  - Native `bd` bundles the embedded Dolt engine inside the executable; a separate Dolt installation or external SQL server is not required.
+- Clone and initialize the repository:
+  ```sh
+  git clone https://github.com/juftin/gh-beads.git
+  cd gh-beads
+  uv sync --locked
+  bd init --prefix hub --non-interactive --skip-agents --skip-hooks
+  ```
+
+### 2. GitHub token permissions and troubleshooting
+
+The hub's Python synchronizer connects directly to GitHub's REST and GraphQL APIs using GitHubKit.
+
+> [!IMPORTANT]
+> Running `gh auth login` configures the GitHub CLI on your system, but does **not** authenticate `gh-beads`. You must export `GH_TOKEN` in your shell environment.
+
+Configure a GitHub Personal Access Token (PAT) with read access:
+
+| Capability | Fine-grained PAT permission | Classic PAT scope | Why it is needed |
+| --- | --- | --- | --- |
+| **Repository metadata** | Metadata: Read-only | `repo` (private) or public read | Resolving repository identity, default branch, stars, and language |
+| **Issues** | Issues: Read-only | `repo` (private) or public read | Importing and refreshing issues, labels, milestones, and author info |
+| **Pull requests** | Pull requests: Read-only | `repo` (private) or public read | Reading PR branches, commits, diff sizes, reviews, and closing issues |
+| **Commit statuses & checks** | Commit statuses: Read-only, Checks: Read-only | `repo` (private) or public read | Evaluating CI pass/fail status and commit check conclusions |
+
+**Troubleshooting access:**
+- **Private repositories:** Ensure your token has access to private repositories (`repo` on classic PAT, or explicit repository selection on fine-grained PAT).
+- **Organizations with SAML SSO:** Click **Configure SSO** next to the generated token and authorize each organization whose repositories you want to synchronize.
+- **Inaccessible repositories:** If a repository cannot be accessed, `gh-beads` reports an error and leaves any previously imported items unchanged; it never assumes closure due to missing permissions.
+
+### 3. One-shot sync and portfolio snapshot
+
+Securely export your token and target repository:
+
+```sh
+: "${GH_TOKEN:?Inject a GitHub read credential}"
+export GH_SYNC_QUERY='repo:owner/your-repo'
+
+# Run a single reconciliation pass
+uv run --locked gh-beads-sync
+```
+
+Expected output on success:
+```text
+Discovered 1 repositories: owner/your-repo
+[owner/your-repo] Synchronizing issues and pull requests...
+[owner/your-repo] Fetched 14 open items (5 PRs, 9 issues)
+[owner/your-repo] Applied snapshots: 14 beads updated, 3 closing dependencies reconciled
+Committed reconciliation checkpoint for owner/your-repo
+Pass complete in 2.1s.
+```
+
+Now inspect your backlog through the portfolio snapshot:
+
+```sh
+uv run --locked gh-beads-snapshot --json
+```
+
+The snapshot returns repository coverage, freshness, and bounded queues:
+```json
+{
+  "coverage": {
+    "status": "complete",
+    "repositories": [
+      {
+        "name": "owner/your-repo",
+        "last_success_at": "2026-10-23T06:00:00Z",
+        "errors": null
+      }
+    ]
+  },
+  "queues": {
+    "ready": {"total": 4, "items": [...]},
+    "attention": {"total": 2, "items": [...]},
+    "in_progress": {"total": 3, "items": [...]}
+  }
+}
+```
+
+### 4. Walk through triaging and advancing an item
+
+1. **Inspect an item:** Find an unblocked item in the ready queue or list items:
+   ```sh
+   bd ready --json
+   bd show hub-1 --json
+   ```
+   The description provides canonical links, reviewer details, check states, closing issue references, and the original body.
+
+2. **Make a local triage decision:**
+   Record your rationale and next action in Beads:
+   ```sh
+   uv run --locked gh-beads-triage hub-1 \
+     --reviewer maintainer \
+     --rationale "Needs reproduction logs from reporter" \
+     --next-action "Request verbose logs on GitHub"
+   ```
+   This review survives future synchronizations under `metadata.triage`.
+
+3. **Execute an authorized external action with a companion tool:**
+   The hub itself is strictly read-only toward GitHub. Use the GitHub CLI (`gh`) or an agent GitHub connector to post an authorized comment or submit a PR review:
+   ```sh
+   gh issue comment 12 --repo owner/your-repo --body "Hi @reporter, could you please provide terminal logs with --verbose enabled?"
+   ```
+
+4. **Record an action receipt:**
+   Record what was executed in a bead note so future sessions know what was done:
+   ```sh
+   bd note hub-1 "receipt: action=comment actor=maintainer timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ) target=gh:owner/your-repo#issue:12 result=confirmed"
+   ```
+
+5. **Revisit in a later session:**
+   On future sync passes, inspect the `changed_since_review` snapshot queue. When the reporter replies, the item will appear in `changed_since_review` so you can continue the investigation without re-asking questions.
+
+### 5. Continuous polling, MCP, and the stewardship skill
+
+- **Continuous polling:** Keep the local backlog up to date with a background worker:
+  ```sh
+  uv run --locked gh-beads-sync --loop --interval 120
+  ```
+- **Workspace selection:** The CLI and MCP tools default to the current directory. Set `BEADS_WORKING_DIR=/path/to/workspace` to keep your Beads data separate from this source checkout.
+- **Connect MCP:** Point your MCP client to `uv run --locked gh-beads-mcp` (stdio transport). It exposes official Beads tools along with `portfolio_snapshot`, `record_triage`, and `trigger_github_sync`. See the [local guide](docs/local.md#3-connect-a-stdio-mcp-client) for copyable client configurations.
+- **Install the Stewardship Skill:** The `oss-steward` skill is available out-of-the-box in [`.agents/skills/oss-steward/SKILL.md`](.agents/skills/oss-steward/SKILL.md) and [`skills/oss-steward/SKILL.md`](skills/oss-steward/SKILL.md). Install it into any repository or agent environment using the `gh-beads-skill` CLI:
+  ```sh
+  # Install to project .agents/skills/ (for Antigravity and Agent Protocol agents):
+  uv run --locked gh-beads-skill install
+
+  # Install across all agent platforms (Antigravity, Claude Code, Cursor, Copilot):
+  uv run --locked gh-beads-skill install --target all
+
+  # Install globally to user directories (~/.agents/skills/ and ~/.gemini/antigravity-cli/skills/):
+  uv run --locked gh-beads-skill install --target global
+  ```
+  The skill guides agents through prompt-injection defense, dependency reviews, contributor engagement, and action receipts. MCP clients can also call the `install_stewardship_skill` tool, read `skills://oss-steward/SKILL.md` directly, or load the `oss_steward` prompt.
+- **Capabilities & boundaries:** The hub is read-only toward GitHub and does not include an autonomous background scheduler. Upstream writes use your authorized companion tool, and scheduled follow-through runs through your agent runner. Contributor setup and developer commands remain in [usage documentation](docs/usage.md).
 
 ## Architecture
 
@@ -149,26 +295,6 @@ Absence, inaccessible data, and failed pages never prove closure. Partial databa
 Unchanged snapshots avoid repeat Beads mutations. Source reads are serial by default; `GH_SYNC_WORKERS=2` through `4` can overlap independent node reads. Workers finish before serial Beads/graph writes. Rate-limit deadlines persist across restarts and suppress requests until the cooldown expires. There is no background MCP task or async scheduler.
 
 Bootstrap excludes old closed history. After bootstrap, all-state deltas can discover work created and closed between polls, but the hub is not a complete event log or a point-in-time GitHub snapshot. See [polling contracts](docs/architecture.md#incremental-polling-and-progress) for overlap, repair, and failure boundaries.
-
-## Quick start
-
-The default local setup needs Python 3.11+, uv, and native Beads `bd` 1.3.1 with embedded Dolt support. Its database lives inside the repository. The embedded engine ships with `bd`; a separate Dolt executable or SQL server is not required.
-
-```sh
-git clone https://github.com/juftin/gh-beads.git
-cd gh-beads
-uv sync --locked
-bd init --prefix hub --non-interactive --skip-agents --skip-hooks
-
-# Inject a GitHub read credential securely before starting the poller.
-: "${GH_TOKEN:?Inject a GitHub read credential}"
-export GH_SYNC_QUERY='user:@me'
-uv run --locked gh-beads-sync --loop --interval 120
-```
-
-Use a fresh Beads workspace for initialization. The credential needs read access to selected repositories and their issues, PRs, checks, and commit statuses, including private/organization access where needed. Sync authenticates directly through GitHubKit; GitHub CLI login is not used. Keep credentials out of committed files and command history.
-
-From another terminal in the initialized repository, inspect progress with `uv run --locked gh-beads-sync --status`. Configure an MCP client to launch `uv run --locked gh-beads-mcp`, which defaults to stdio. The [local guide](docs/local.md) includes a copyable client configuration and instructions for keeping code and data in separate repositories.
 
 ## Local Dolt and stdio
 

@@ -104,3 +104,48 @@ def test_invalid_repository_selection(names: list[str]) -> None:
     """Empty selections and scope injection cannot fall back to the full portfolio."""
     with pytest.raises(ValueError, match="OWNER/REPO"):
         sync.repository_scopes(names)
+
+
+def test_skill_cli_outside_checkout(tmp_path: Path) -> None:
+    """The installed gh-beads-skill CLI lists, displays, and installs skills outside checkout."""
+    env = {**os.environ, "BEADS_WORKING_DIR": str(tmp_path), "PYTHONPATH": ""}
+
+    # 1. List skills
+    list_res = subprocess.run(
+        ["gh-beads-skill", "list", "--json"],
+        cwd=tmp_path,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    skills = json.loads(list_res.stdout)
+    assert any(s["name"] == "oss-steward" for s in skills)
+
+    # 2. Show skill
+    show_res = subprocess.run(
+        ["gh-beads-skill", "show", "oss-steward"],
+        cwd=tmp_path,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    assert "Open-Source Maintainer Stewardship" in show_res.stdout
+
+    # 3. Install skill to workspace
+    install_res = subprocess.run(
+        ["gh-beads-skill", "install", "oss-steward", "--target", "workspace", "--json"],
+        cwd=tmp_path,
+        env=env,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    data = json.loads(install_res.stdout)
+    assert data["status"] == "success"
+    installed_skill = tmp_path / ".agents" / "skills" / "oss-steward" / "SKILL.md"
+    assert installed_skill.is_file()

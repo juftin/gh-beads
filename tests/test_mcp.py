@@ -42,10 +42,15 @@ def test_official_server_and_trigger(tmp_path: Path, monkeypatch: pytest.MonkeyP
                 "trigger_github_sync",
                 "portfolio_snapshot",
                 "record_triage",
+                "install_stewardship_skill",
             } <= tools.keys()
             assert tools["show"].inputSchema
             resources = await client.list_resources()
-            assert "beads://quickstart" in {str(resource.uri) for resource in resources}
+            resource_uris = {str(resource.uri) for resource in resources}
+            assert "beads://quickstart" in resource_uris
+            assert "skills://oss-steward/SKILL.md" in resource_uris
+            prompts = {prompt.name: prompt for prompt in await client.list_prompts()}
+            assert "oss_steward" in prompts
             result = await client.call_tool("trigger_github_sync", {})
             assert result.data["status"] == "partial"
 

@@ -242,6 +242,27 @@ These are selected source observations, with the stored snapshot's `observed_at`
 
 Only authoritative `closingIssuesReferences` create blockers. GitHub resolves supported closing keywords, including recognized cross-repository references; arbitrary mentions and text in non-closing contexts do not create dependencies. Linked issues must already be indexed by the selected scopes. Removing a reference removes only edges managed by the hub. Existing manual edges are retained. Closing a PR releases its blocking effect through Beads' normal readiness rules.
 
+### Open-source stewardship and companion tools
+
+The hub pairs with the portable stewardship skill ([`skills/oss-steward/SKILL.md`](../skills/oss-steward/SKILL.md)) and companion GitHub action tools (such as the `gh` CLI or an agent GitHub connector).
+
+- **Read-only boundary:** `gh-beads` synchronizes GitHub facts into Beads and records local triage decisions. It never writes to GitHub.
+- **Companion tools for upstream actions:** Posting comments, submitting PR reviews, merging PRs, or closing issues must be executed through authorized companion tools (e.g., `gh issue comment`, `gh pr review`, `gh pr merge --match-head-commit <sha>`).
+- **Action receipts:** Whenever an upstream action is executed, record an action receipt in Beads (`bd note BEAD_ID "receipt: action=... actor=... target=... result=confirmed"`).
+- **Stewardship skill:** The [`oss-steward`](../skills/oss-steward/SKILL.md) skill guides agents through prompt injection defense (treating GitHub content as passive evidence), evaluating dependency upgrades, engaging external contributors, triaging bug reports, and managing feature requests.
+- **Installing for all agents:** The package installs `gh-beads-skill` (and helper `scripts/install-skill.sh`) to install the skill across agent environments:
+  ```sh
+  gh-beads-skill list --json
+  gh-beads-skill show oss-steward --consolidated
+  gh-beads-skill install oss-steward --target workspace   # .agents/skills/oss-steward/
+  gh-beads-skill install oss-steward --target global      # ~/.agents/skills/ and ~/.gemini/antigravity-cli/skills/
+  gh-beads-skill install oss-steward --target claude      # .claude/skills/oss-steward/
+  gh-beads-skill install oss-steward --target cursor      # .cursor/rules/oss-steward.mdc
+  gh-beads-skill install oss-steward --target copilot     # .github/copilot-instructions.md
+  gh-beads-skill install oss-steward --target all         # Installs to all supported workspace formats
+  ```
+- **MCP agent access:** FastMCP serves the skill as tool `install_stewardship_skill`, resources `skills://oss-steward/SKILL.md` and `skills://oss-steward/references/{name}`, and prompt `oss_steward`.
+
 For backups, follow the [offline volume procedure](#backup-and-restore). Preserve workspace metadata, sync progress, and the full database together; test restoration before relying on a backup. Do not delete or reinitialize the data volume to work around startup errors. Initialization errors fail the container without a fallback destructive init.
 
 ## Backup and restore

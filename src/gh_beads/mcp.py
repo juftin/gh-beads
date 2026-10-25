@@ -8,9 +8,55 @@ from typing import Any
 from beads_mcp.server import mcp as mcp
 
 from gh_beads.runtime import wait_for_hub
+from gh_beads.skill import (
+    get_reference_content,
+    get_skill_content,
+    install_skill,
+)
 from gh_beads.snapshot import portfolio_snapshot
 from gh_beads.sync import run_sync
 from gh_beads.triage import record_triage
+
+
+@mcp.tool(
+    name="install_stewardship_skill",
+    description=(
+        "Install the oss-steward maintainer skill into an agent environment "
+        "(workspace, global, claude, cursor, copilot, or all)."
+    ),
+)
+def install_stewardship_skill_tool(
+    target: str = "workspace",
+    directory: str | None = None,
+    overwrite: bool = False,
+) -> dict[str, Any]:
+    """Install the oss-steward skill files into the designated agent discovery path."""
+    from pathlib import Path
+
+    return install_skill(
+        skill_name="oss-steward",
+        target=target,
+        base_dir=Path(directory) if directory else None,
+        overwrite=overwrite,
+    )
+
+
+@mcp.resource("skills://oss-steward/SKILL.md")
+def get_stewardship_skill_resource() -> str:
+    """The main open-source stewardship skill instructions."""
+    return get_skill_content("oss-steward")
+
+
+@mcp.resource("skills://oss-steward/references/{name}")
+def get_stewardship_reference_resource(name: str) -> str:
+    """A reference guide for the open-source stewardship skill."""
+    return get_reference_content("oss-steward", name)
+
+
+@mcp.prompt(name="oss_steward")
+def oss_steward_prompt() -> str:
+    """Procedures for open-source repository triage, investigation, and maintenance."""
+    return get_skill_content("oss-steward")
 
 
 @mcp.tool(name="portfolio_snapshot")

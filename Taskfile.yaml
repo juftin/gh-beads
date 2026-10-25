@@ -43,6 +43,9 @@ tasks:
     desc: Show stored portfolio coverage, bounded queues, and saved triage in Compose
     cmds:
       - docker compose exec -T github-reconciler gh-beads-snapshot {{.CLI_ARGS}}
+  install-skill:
+    desc: Install the oss-steward skill into the local workspace or specified agent target
+    cmds: ['uv run --locked gh-beads-skill install {{.CLI_ARGS}}']
   run:
     desc: Run a command in the project environment
     cmds: ['uv run --locked {{.CLI_ARGS}}']
