@@ -12,8 +12,8 @@ from fastmcp.client.transports import StdioTransport
 async def check_stdio() -> None:
     """Discover official capabilities and read real Beads data over a spawned stdio session."""
     transport = StdioTransport(
-        command="gh-beads-mcp",
-        args=[],
+        command="gh-beads",
+        args=["mcp"],
         env={**os.environ, "MCP_TRANSPORT": "stdio", "GH_TOKEN": ""},
     )
     async with asyncio.timeout(60), Client(transport) as client:

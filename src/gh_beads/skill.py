@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
-import json
 import os
 import shutil
 from pathlib import Path
@@ -261,99 +259,3 @@ def install_skill(
         "installed_paths": installed_paths,
         "actions": actions_taken,
     }
-
-
-def main() -> None:
-    """CLI entrypoint for managing and installing agent skills."""
-    parser = argparse.ArgumentParser(
-        prog="gh-beads-skill",
-        description="Inspect and install gh-beads skills across agent ecosystems.",
-    )
-    subparsers = parser.add_subparsers(dest="action", help="Action to perform")
-
-    # list
-    list_parser = subparsers.add_parser("list", help="List available skills")
-    list_parser.add_argument("--json", action="store_true", help="Output as JSON")
-
-    # show
-    show_parser = subparsers.add_parser("show", help="Show skill instructions")
-    show_parser.add_argument("name", nargs="?", default=DEFAULT_SKILL, help="Skill name")
-    show_parser.add_argument(
-        "--consolidated",
-        action="store_true",
-        help="Inline all reference files into a single document",
-    )
-
-    # install
-    install_parser = subparsers.add_parser("install", help="Install skill into agent directories")
-    install_parser.add_argument("name", nargs="?", default=DEFAULT_SKILL, help="Skill name")
-    install_parser.add_argument(
-        "--target",
-        choices=SUPPORTED_TARGETS,
-        default="workspace",
-        help="Agent target platform (default: workspace)",
-    )
-    install_parser.add_argument(
-        "--dir",
-        type=Path,
-        default=None,
-        help="Base directory for project installation (default: current working directory)",
-    )
-    install_parser.add_argument(
-        "--dest",
-        type=Path,
-        default=None,
-        help="Explicit destination directory (sets target=custom)",
-    )
-    install_parser.add_argument(
-        "--overwrite",
-        action="store_true",
-        help="Overwrite existing skill files if already present",
-    )
-    install_parser.add_argument("--json", action="store_true", help="Output as JSON")
-
-    args = parser.parse_args()
-
-    if args.action == "list" or args.action is None:
-        skills = list_skills()
-        if getattr(args, "json", False):
-            print(json.dumps(skills, indent=2))
-        else:
-            print("Available skills:")
-            for s in skills:
-                print(f"  • {s['name']}: {s['description']}")
-                if s["references"]:
-                    print(f"    References: {', '.join(s['references'])}")
-
-    elif args.action == "show":
-        try:
-            if args.consolidated:
-                content = consolidate_skill(args.name)
-            else:
-                content = get_skill_content(args.name)
-            print(content)
-        except FileNotFoundError as exc:
-            parser.exit(1, f"Error: {exc}\n")
-
-    elif args.action == "install":
-        target = "custom" if args.dest else args.target
-        try:
-            res = install_skill(
-                skill_name=args.name,
-                target=target,
-                base_dir=args.dir,
-                custom_dest=args.dest,
-                overwrite=args.overwrite,
-            )
-            if args.json:
-                print(json.dumps(res, indent=2))
-            else:
-                print(f"Successfully installed skill '{args.name}' (target: {target}):")
-                for action in res["actions"]:
-                    print(f"  ✓ {action}")
-        except (ValueError, FileNotFoundError) as exc:
-            parser.exit(1, f"Installation error: {exc}\n")
-
-
-if __name__ == "__main__":
-    main()

@@ -43,7 +43,7 @@ Record decisions with clear rationale and next steps:
 
 ```sh
 # Example: Accepting a feature request
-uv run --locked gh-beads-triage BEAD_ID \
+uv run --locked gh-beads triage BEAD_ID \
   --reviewer maintainer \
   --rationale "Fits roadmap for v2.0; approved in design discussion" \
   --next-action "Create tracking subtasks and milestone assignment"

@@ -74,7 +74,7 @@ When authorized to merge a dependency PR:
    ```
 3. Record the triage review and action receipt in Beads:
    ```sh
-   uv run --locked gh-beads-triage BEAD_ID \
+   uv run --locked gh-beads triage BEAD_ID \
      --reviewer agent \
      --rationale "Verified changelog, security advisory fix, and clean test run" \
      --next-action "Merged via gh CLI"

@@ -7,7 +7,6 @@ reconcilers; all database access goes through bd, never direct SQL writes.
 
 from __future__ import annotations
 
-import argparse
 import csv
 import fcntl
 import io
@@ -15,7 +14,6 @@ import json
 import os
 import re
 import subprocess
-import sys
 import time
 from pathlib import Path
 from typing import Any
@@ -571,43 +569,3 @@ def run_sync(*, force_full: bool = False, repositories: list[str] | None = None)
             subprocess.TimeoutExpired,
         ) as error:
             return {"status": "partial", "errors": [str(error)]}
-
-
-def main() -> None:
-    """Print one JSON summary per pass; periodic failures remain visible and retry later."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    mode = parser.add_mutually_exclusive_group()
-    mode.add_argument("--loop", action="store_true", help="Reconcile periodically")
-    mode.add_argument("--status", action="store_true", help="Show durable polling progress")
-    parser.add_argument("--full", action="store_true", help="Force a full open-backlog repair")
-    parser.add_argument(
-        "--repo",
-        action="append",
-        dest="repositories",
-        metavar="OWNER/REPO",
-        help="Sync only this repository (repeatable); replaces GH_SYNC_QUERY for this run",
-    )
-    parser.add_argument("--interval", type=int, default=120, help="Seconds between sync passes")
-    args = parser.parse_args()
-    try:
-        repository_scopes(args.repositories)
-    except ValueError as error:
-        parser.error(str(error))
-    if args.status and args.repositories:
-        parser.error("--repo cannot be combined with --status")
-    if args.interval < 1:
-        parser.error("--interval must be positive")
-    if args.status:
-        workspace = Path(os.environ.get("BEADS_WORKING_DIR", "."))
-        print(json.dumps(SyncState(workspace / ".github-sync-state.json").data))
-        return
-    while True:
-        summary = run_sync(force_full=args.full, repositories=args.repositories)
-        print(json.dumps(summary), flush=True)
-        if not args.loop:
-            sys.exit(1 if summary["status"] == "partial" else 0)
-        time.sleep(args.interval)
-
-
-if __name__ == "__main__":
-    main()

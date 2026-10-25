@@ -12,12 +12,12 @@ Check source coverage before recommending changes:
 
 ```sh
 # Local workspace
-uv run --locked gh-beads-snapshot --json
+uv run --locked gh-beads snapshot --json
 # Compose
 task snapshot
 ```
 
-The snapshot reports coverage, repository `last_success_at`/errors, and bounded ready/blocked/in-progress/attention/unreviewed/changed queues. Check each queue's `total` and `truncated`; use `--repo owner/api` to narrow it or `--limit 100` for more items. Explain unknown coverage and old timestamps. If needed, refresh with `uv run --locked gh-beads-sync` locally or `task sync-now` in Compose. Respect `busy` and `retry_at` cooldowns. Item `observed_at` stays unchanged on identical polls.
+The snapshot reports coverage, repository `last_success_at`/errors, and bounded ready/blocked/in-progress/attention/unreviewed/changed queues. Check each queue's `total` and `truncated`; use `--repo owner/api` to narrow it or `--limit 100` for more items. Explain unknown coverage and old timestamps. If needed, refresh with `uv run --locked gh-beads sync` locally or `task sync-now` in Compose. Respect `busy` and `retry_at` cooldowns. Item `observed_at` stays unchanged on identical polls.
 
 ## Triage the portfolio
 
@@ -40,7 +40,7 @@ bd show BEAD_ID --json
 
 Comma-separated `--label` values mean AND. Source `type:pr` is a label; imported PRs are Beads tasks. `bd ready` excludes in-progress work, so also inspect the active list: healthy PRs usually wait in progress. An issue can have stored `status=open` while dependencies block it. `bd dep add A B` means A depends on B.
 
-For a selected refresh, use `uv run --locked gh-beads-sync --repo owner/api` or `task sync-now -- --repo owner/api`. Persistent selection uses `GH_SYNC_QUERY='repo:owner/api;repo:owner/web'`. Selection preserves excluded imports; it does not delete them. Use `--full` for coverage repair, not routinely on every triage pass.
+For a selected refresh, use `uv run --locked gh-beads sync --repo owner/api` or `task sync-now -- --repo owner/api`. Persistent selection uses `GH_SYNC_QUERY='repo:owner/api;repo:owner/web'`. Selection preserves excluded imports; it does not delete them. Use `--full` for coverage repair, not routinely on every triage pass.
 
 ## Record decisions safely
 
@@ -48,7 +48,7 @@ Replace `BEAD_ID` with an actual ID. Priorities are 0 (critical) through 4 (back
 
 ```sh
 bd update BEAD_ID --priority 1 --add-label category:bug-fix --json
-uv run --locked gh-beads-triage BEAD_ID --reviewer agent --rationale 'Why this decision' --next-action 'Concrete next step'
+uv run --locked gh-beads triage BEAD_ID --reviewer agent --rationale 'Why this decision' --next-action 'Concrete next step'
 bd note BEAD_ID 'Triage rationale and next action.' --json
 bd comments add BEAD_ID 'Evidence, decision, or handoff.' --json
 bd update BEAD_ID --claim --json
@@ -73,7 +73,7 @@ For detailed open-source triage, dependency reviews, external contribution workf
 - Workspace location: [.agents/skills/oss-steward/SKILL.md](.agents/skills/oss-steward/SKILL.md) and [skills/oss-steward/SKILL.md](skills/oss-steward/SKILL.md).
 - To install the skill into any project or agent platform:
   ```sh
-  uv run --locked gh-beads-skill install [--target workspace|global|claude|cursor|copilot|all]
+  uv run --locked gh-beads skill install [--target workspace|global|claude|cursor|copilot|all]
   ```
 - Or using the shell helper: `bash scripts/install-skill.sh [TARGET]`
 - For MCP agents: call `install_stewardship_skill`, read `skills://oss-steward/SKILL.md`, or invoke the `oss_steward` prompt.

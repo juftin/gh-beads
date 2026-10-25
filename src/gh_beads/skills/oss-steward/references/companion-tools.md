@@ -11,7 +11,7 @@ To perform upstream maintainer actions (posting comments, submitting reviews, me
 > [!IMPORTANT]
 > The GitHub CLI (`gh`) and the `gh-beads` hub use independent authentication mechanisms. Running `gh auth login` configures the GitHub CLI on your system, but does **not** inject the `GH_TOKEN` environment variable required by `gh-beads`'s internal GitHubKit adapter.
 
-- **For `gh-beads`:** Ensure `GH_TOKEN` is exported in the environment where `gh-beads-sync` runs.
+- **For `gh-beads`:** Ensure `GH_TOKEN` is exported in the environment where `gh-beads sync` runs.
 - **For GitHub CLI (`gh`):** Authenticate with `gh auth login` or export `GITHUB_TOKEN` / `GH_TOKEN` with write permissions.
 
 ### Capability Permissions

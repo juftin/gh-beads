@@ -42,10 +42,10 @@ tasks:
   snapshot:
     desc: Show stored portfolio coverage, bounded queues, and saved triage in Compose
     cmds:
-      - docker compose exec -T github-reconciler gh-beads-snapshot {{.CLI_ARGS}}
+      - docker compose exec -T github-reconciler gh-beads snapshot {{.CLI_ARGS}}
   install-skill:
     desc: Install the oss-steward skill into the local workspace or specified agent target
-    cmds: ['uv run --locked gh-beads-skill install {{.CLI_ARGS}}']
+    cmds: ['uv run --locked gh-beads skill install {{.CLI_ARGS}}']
   run:
     desc: Run a command in the project environment
     cmds: ['uv run --locked {{.CLI_ARGS}}']
@@ -74,8 +74,8 @@ tasks:
   sync-now:
     desc: Run one reconciliation in Compose using the shared sync lock
     cmds:
-      - docker compose exec -T github-reconciler gh-beads-sync {{.CLI_ARGS}}
+      - docker compose exec -T github-reconciler gh-beads sync {{.CLI_ARGS}}
   sync-status:
     desc: Show per-repository sync checkpoints, successes, failures, and rate cooldown
     cmds:
-      - docker compose exec -T github-reconciler gh-beads-sync --status
+      - docker compose exec -T github-reconciler gh-beads sync --status

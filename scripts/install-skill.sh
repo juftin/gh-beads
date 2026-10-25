@@ -17,9 +17,9 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# Try using gh-beads-skill CLI if uv is available
+# Try using gh-beads skill CLI if uv is available
 if command -v uv >/dev/null 2>&1 && [ -f "$REPO_ROOT/pyproject.toml" ]; then
-    exec uv run --project "$REPO_ROOT" --locked gh-beads-skill install "$@"
+    exec uv run --project "$REPO_ROOT" --locked gh-beads skill install "$@"
 fi
 
 # Fallback: pure shell copying

@@ -17,9 +17,9 @@ This conversation authorized assessment and documentation updates. It has not im
 
 ## What exists at the handoff
 
-The assessment found a useful portfolio triage foundation, with gaps in detailed investigation, upstream actions, and scheduled follow-up. Existing CLI commands are `gh-beads-sync`, `gh-beads-mcp`, `gh-beads-runtime`, `gh-beads-snapshot`, and `gh-beads-triage`. The wrapper adds `trigger_github_sync`, `portfolio_snapshot`, and `record_triage` to the official Beads MCP server.
+The assessment found a useful portfolio triage foundation, with gaps in detailed investigation, upstream actions, and scheduled follow-up. Existing CLI commands are `gh-beads sync`, `gh-beads mcp`, `gh-beads runtime`, `gh-beads snapshot`, and `gh-beads triage`. The wrapper adds `trigger_github_sync`, `portfolio_snapshot`, and `record_triage` to the official Beads MCP server.
 
-There is no packaged stewardship skill, live-investigation command, native GitHub action layer, structured timed follow-up queue, or scheduled reasoning agent. Names such as `gh-beads-doctor`, `gh-beads-inspect`, and `gh-beads-action plan/apply` in the roadmap are proposals; do not write instructions that present them as available.
+There is no packaged stewardship skill, live-investigation command, native GitHub action layer, structured timed follow-up queue, or scheduled reasoning agent. Names such as `gh-beads doctor`, `gh-beads inspect`, and `gh-beads action plan/apply` in the roadmap are proposals; do not write instructions that present them as available.
 
 Important operational details for implementation and skill authors:
 

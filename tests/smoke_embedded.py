@@ -44,7 +44,7 @@ async def check_clients(source: FixtureGitHub, beads: Beads) -> None:
     assert not any(label.startswith("github:") for row in beads.items() for label in row["labels"])
     beads.call("update", issue_id, "--priority", "1", "--notes", "Synthetic local reasoning")
     for session in range(2):
-        transport = StdioTransport(command="gh-beads-mcp", args=[], env=dict(os.environ))
+        transport = StdioTransport(command="gh-beads", args=["mcp"], env=dict(os.environ))
         async with asyncio.timeout(180), Client(transport) as client:
             assert "ready" in {tool.name for tool in await client.list_tools()}
             assert await client.read_resource("beads://quickstart")
@@ -147,7 +147,7 @@ def main() -> None:
                     assert result["status"] == "complete", result
                     asyncio.run(check_clients(source, Beads()))
                 status = subprocess.run(
-                    ["gh-beads-sync", "--status"],
+                    ["gh-beads", "sync", "--status"],
                     check=True,
                     capture_output=True,
                     text=True,

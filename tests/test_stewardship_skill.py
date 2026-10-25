@@ -74,8 +74,8 @@ def test_readme_maintainer_walkthrough() -> None:
 
     assert "## Maintain your first repository" in content
     assert "skills/oss-steward/SKILL.md" in content
-    assert "gh-beads-snapshot" in content
-    assert "gh-beads-triage" in content
+    assert "gh-beads snapshot" in content
+    assert "gh-beads triage" in content
     assert "receipt:" in content
 
 

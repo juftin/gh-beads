@@ -44,7 +44,7 @@ When requesting information:
 - Schedule a follow-up revisit date (e.g., 7–14 days).
 - Record the decision in Beads:
   ```sh
-  uv run --locked gh-beads-triage BEAD_ID \
+  uv run --locked gh-beads triage BEAD_ID \
     --reviewer agent \
     --rationale "Awaiting minimal reproduction steps and verbose logs from reporter" \
     --next-action "Check for reporter response by 2026-10-30"

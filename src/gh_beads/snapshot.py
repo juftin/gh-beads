@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
-import json
 import os
 import time
 from collections import Counter
@@ -183,17 +181,3 @@ def portfolio_snapshot(
             ),
         },
     }
-
-
-def main() -> None:
-    """Print the stored portfolio as JSON, including explicit coverage and truncation."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--repo", action="append", dest="repositories")
-    parser.add_argument("--limit", type=int, default=20)
-    parser.add_argument("--json", action="store_true", help="JSON output (the default)")
-    args = parser.parse_args()
-    try:
-        result = portfolio_snapshot(args.repositories, args.limit)
-    except (RuntimeError, ValueError) as exc:
-        parser.exit(1, f"{exc}\n")
-    print(json.dumps(result))

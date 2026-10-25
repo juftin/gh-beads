@@ -32,9 +32,9 @@ Stewardship means more than importing work items into a backlog: it means making
 - When authorization has not been granted, prepare the reviewable action draft (e.g., proposed comment body or merge plan) and present it to the maintainer for confirmation.
 
 ### 4. Critical Operational Distinctions
-- **Local Triage vs. Upstream Review:** A saved triage record (`gh-beads-triage`) preserves local evaluation history in Beads; it is **not** a submitted GitHub PR review.
+- **Local Triage vs. Upstream Review:** A saved triage record (`gh-beads triage`) preserves local evaluation history in Beads; it is **not** a submitted GitHub PR review.
 - **Backlog Readiness vs. Upstream Mergeability:** Beads readiness (`bd ready`) indicates work that is unblocked in the local graph; it does **not** prove that a PR satisfies GitHub merge requirements, branch protection rules, required approvals, or passing status checks.
-- **Sync Polling vs. Stewardship Judgment:** The reconciler (`gh-beads-sync`) syncs factual source state; the stewardship agent provides judgment, investigation, and outreach.
+- **Sync Polling vs. Stewardship Judgment:** The reconciler (`gh-beads sync`) syncs factual source state; the stewardship agent provides judgment, investigation, and outreach.
 
 ---
 
@@ -44,7 +44,7 @@ Before triaging or deciding actions, verify backlog freshness:
 
 ```sh
 # Local embedded workspace
-uv run --locked gh-beads-snapshot --json
+uv run --locked gh-beads snapshot --json
 
 # Or in Docker Compose
 task snapshot
@@ -56,7 +56,7 @@ Inspect the returned JSON:
 3. **Queue Boundaries:** Check `total` and `truncated` on each queue (`ready`, `blocked`, `in_progress`, `attention`, `unreviewed`, `changed_since_review`). If a queue is truncated, inspect focused subsets using `--repo OWNER/REPO` or `--limit N`. Never claim exhaustive coverage when queues are truncated.
 4. **Triggering Refresh:** If coverage is stale or missing recent changes, trigger sync:
    ```sh
-   uv run --locked gh-beads-sync --repo OWNER/REPO
+   uv run --locked gh-beads sync --repo OWNER/REPO
    ```
 
 ---
@@ -79,7 +79,7 @@ Inspect the returned JSON:
 When triaging an item:
 1. Save the structured triage review in Beads:
    ```sh
-   uv run --locked gh-beads-triage BEAD_ID \
+   uv run --locked gh-beads triage BEAD_ID \
      --reviewer "<name-or-agent>" \
      --rationale "<why-this-decision>" \
      --next-action "<concrete-next-step>" \
@@ -105,7 +105,7 @@ When triaging an item:
 - **Action:**
   - Do not merge simply because CI passed.
   - Draft a polite comment on the PR (or split the PR) asking to defer or isolate the breaking update.
-  - Record triage rationale with `gh-beads-triage`, set next action to "Split dependency update or update deprecated config", and assign a follow-up revisit date.
+  - Record triage rationale with `gh-beads triage`, set next action to "Split dependency update or update deprecated config", and assign a follow-up revisit date.
 
 ### 2. Incomplete Bug Report
 - **Observation:** A user files an issue stating: "Application crashes on startup." No stack trace, OS version, or reproduction steps are provided.

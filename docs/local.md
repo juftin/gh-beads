@@ -4,8 +4,8 @@ The default local workflow stores the backlog inside a repository under `.beads/
 
 ```mermaid
 flowchart LR
-    GitHub[GitHub] --> Poller[uv: gh-beads-sync]
-    Agent[MCP client] -->|stdio| MCP[uv: gh-beads-mcp]
+    GitHub[GitHub] --> Poller[uv: gh-beads sync]
+    Agent[MCP client] -->|stdio| MCP[uv: gh-beads mcp]
     MCP -->|Sync trigger| Reconcile[Shared reconciliation code]
     Poller --> BD[bd with embedded Dolt]
     Reconcile --> BD
@@ -54,25 +54,25 @@ Inject `GH_TOKEN` securely into the poller's environment, then run from the init
 ```sh
 : "${GH_TOKEN:?Inject a GitHub read credential}"
 export GH_SYNC_QUERY='user:@me'
-uv run --locked gh-beads-sync --loop --interval 120
+uv run --locked gh-beads sync --loop --interval 120
 ```
 
 Keep one poller running while you want automatic updates. The CLI defaults to the current repository for database access, sync locking, and progress. Use `--interval` for the native pause; `GH_SYNC_INTERVAL` configures the Compose command. Repository scopes, incremental reads, PR evidence refresh, and local-field ownership are the same in both deployments.
 
-To sync only named repositories, set `GH_SYNC_QUERY='repo:example/api;repo:example/web'` or pass repeated `--repo` flags, for example `uv run --locked gh-beads-sync --repo example/api --repo example/web --loop`. Flags replace configured scopes for that process. Each selected GitHub repository becomes an epic containing its imported issues and PRs. See [selection and epic behavior](usage.md#select-repositories).
+To sync only named repositories, set `GH_SYNC_QUERY='repo:example/api;repo:example/web'` or pass repeated `--repo` flags, for example `uv run --locked gh-beads sync --repo example/api --repo example/web --loop`. Flags replace configured scopes for that process. Each selected GitHub repository becomes an epic containing its imported issues and PRs. See [selection and epic behavior](usage.md#select-repositories).
 
 From another terminal in that repository:
 
 ```sh
-uv run --locked gh-beads-sync --status
-uv run --locked gh-beads-sync --full
+uv run --locked gh-beads sync --status
+uv run --locked gh-beads sync --full
 bd ready --label 'type:pr' --json
 ```
 
 One-shot source sync requires `GH_TOKEN`; progress inspection and reading existing work do not. For a repository other than the code checkout, select the installed project without changing the working directory:
 
 ```sh
-uv run --project /absolute/path/to/gh-beads --locked gh-beads-sync --status
+uv run --project /absolute/path/to/gh-beads --locked gh-beads sync --status
 ```
 
 Alternatively, set `BEADS_WORKING_DIR` to the absolute path of the initialized repository. Use the same workspace for every poller, CLI call, and MCP session so they share the lock and checkpoints. A shared hub can still import work from many GitHub repositories into this one local database.
@@ -88,7 +88,7 @@ Configure your client to launch the wrapper through uv. `BEADS_WORKING_DIR` poin
       "command": "uv",
       "args": [
         "run", "--project", "/absolute/path/to/gh-beads",
-        "--locked", "gh-beads-mcp"
+        "--locked", "gh-beads", "mcp"
       ],
       "env": {
         "BEADS_WORKING_DIR": "/absolute/path/to/your-repository",
@@ -104,7 +104,7 @@ Configure your client to launch the wrapper through uv. `BEADS_WORKING_DIR` poin
 Replace all example paths with actual absolute paths; client environment values do not automatically expand `$HOME` or `~`. Use an absolute `command` path if the client cannot find uv. Stdio is the wrapper's default transport; `MCP_TRANSPORT=stdio` can also select it explicitly. The normal terminal command is:
 
 ```sh
-uv run --locked gh-beads-mcp
+uv run --locked gh-beads mcp
 ```
 
 The command expects an MCP client on stdin/stdout. It starts no HTTP listener, and runtime logs use stderr. Startup checks database access through `bd info`, which works with either embedded or server-backed workspaces. The official tools, `beads://quickstart`, and synchronous `trigger_github_sync` tool remain available.
