@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import fcntl
 import hashlib
 import json
@@ -125,19 +124,3 @@ def record_triage(
             json.dumps({"triage": {"version": 1, "reviews": [*reviews, review]}}),
         )
     return {"id": bead["id"], "review": review, "review_count": len(reviews) + 1}
-
-
-def main() -> None:
-    """Record rationale without changing priority, ownership, notes, or status."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("bead_id")
-    parser.add_argument("--rationale", required=True)
-    parser.add_argument("--next-action", required=True)
-    parser.add_argument("--reviewer")
-    parser.add_argument("--expected-fingerprint")
-    args = parser.parse_args()
-    try:
-        result = record_triage(**vars(args))
-    except (RuntimeError, ValueError) as exc:
-        parser.exit(1, f"{exc}\n")
-    print(json.dumps(result))

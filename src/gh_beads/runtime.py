@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import argparse
 import os
 import re
 import socket
@@ -77,21 +76,3 @@ def wait_for_hub(*, sql_only: bool = False, timeout: float = 120) -> None:
                 return
         time.sleep(1)
     raise TimeoutError("Dolt or hub initialization did not become ready within the startup timeout")
-
-
-def main() -> None:
-    """Wait for a runtime dependency or provision database-scoped remote access."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--sql", action="store_true", help="Wait only for the SQL listener")
-    parser.add_argument(
-        "--configure-remote", action="store_true", help="Provision remote SQL access"
-    )
-    args = parser.parse_args()
-    if args.configure_remote:
-        configure_remote_access()
-    else:
-        wait_for_hub(sql_only=args.sql)
-
-
-if __name__ == "__main__":
-    main()

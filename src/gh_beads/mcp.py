@@ -95,7 +95,7 @@ def trigger_github_sync(repositories: list[str] | None = None) -> dict[str, Any]
     return run_sync(repositories=repositories)
 
 
-def main() -> None:
+def serve() -> None:
     """Wait for initialization and serve the official MCP instance on the configured transport."""
     transport = os.environ.get("MCP_TRANSPORT", "stdio")
     if transport not in {"stdio", "streamable-http", "sse"}:
@@ -109,7 +109,3 @@ def main() -> None:
         host=os.environ.get("MCP_HOST", "0.0.0.0"),
         port=int(os.environ.get("MCP_PORT", "8080")),
     )
-
-
-if __name__ == "__main__":
-    main()

@@ -137,7 +137,7 @@ def test_transport_settings(monkeypatch: pytest.MonkeyPatch, transport: str) -> 
     monkeypatch.setattr(server, "wait_for_hub", lambda: None)
     calls: list[dict[str, Any]] = []
     monkeypatch.setattr(mcp, "run", lambda **kwargs: calls.append(kwargs))
-    server.main()
+    server.serve()
     expected: dict[str, Any] = {"transport": transport}
     if transport != "stdio":
         expected.update(host="127.0.0.1", port=8090)
@@ -162,8 +162,8 @@ def test_stdio_client_process(tmp_path: Path, explicit: bool) -> None:
     if explicit:
         env.update(BEADS_WORKING_DIR=str(tmp_path), BEADS_DIR=str(beads_dir), MCP_TRANSPORT="stdio")
     transport = StdioTransport(
-        command="gh-beads-mcp",
-        args=[],
+        command="gh-beads",
+        args=["mcp"],
         cwd=str(tmp_path),
         env=env,
     )

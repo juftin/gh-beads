@@ -57,7 +57,7 @@ services:
   beads-mcp:
     <<: *runtime
     network_mode: service:dolt
-    command: [gh-beads-mcp]
+    command: [gh-beads, mcp]
     depends_on:
       hub:
         condition: service_healthy
@@ -80,7 +80,7 @@ services:
   github-reconciler:
     <<: *runtime
     network_mode: service:dolt
-    command: [gh-beads-sync, --loop, --interval, '${GH_SYNC_INTERVAL:-120}']
+    command: [gh-beads, sync, --loop, --interval, '${GH_SYNC_INTERVAL:-120}']
     depends_on:
       hub:
         condition: service_healthy

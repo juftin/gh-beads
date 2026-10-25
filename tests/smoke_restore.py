@@ -112,7 +112,8 @@ def native_restore() -> None:
                 )
                 reviewed = subprocess.run(
                     [
-                        "gh-beads-triage",
+                        "gh-beads",
+                        "triage",
                         pr_id,
                         "--rationale",
                         "Reviewed source evidence",
@@ -133,7 +134,7 @@ def native_restore() -> None:
                 assert reconcile(github, beads, "user:@me", state)["writes"] == 0
                 baseline = capture()
                 snapshot_cli = subprocess.run(
-                    ["gh-beads-snapshot", "--json", "--limit", "1000"],
+                    ["gh-beads", "snapshot", "--json", "--limit", "1000"],
                     check=True,
                     capture_output=True,
                     text=True,

@@ -53,7 +53,7 @@ docker run --rm --network "${stack}_default" -e BEADS_DOLT_SERVER_HOST=dolt \
 
 compose down
 compose up -d --wait --wait-timeout 180
-compose exec -T hub gh-beads-runtime
+compose exec -T hub gh-beads runtime
 compose exec -T hub python3 -c \
   'import json, subprocess; assert len(json.loads(subprocess.check_output(["bd", "list", "--all", "--limit", "0", "--json"], text=True))) == 3'
 compose exec -T github-reconciler python3 -c \

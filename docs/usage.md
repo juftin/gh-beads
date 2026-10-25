@@ -4,11 +4,11 @@
 
 Python 3.11+, uv, Task, and Docker with the Compose plugin are required for the full validation workflow. `task install` runs `uv sync --locked`, installing the `src/gh_beads` package editable and its development dependencies. `task fix`, `task lint`, `task check`, and `task test` cover formatting, lint, shell syntax, types, and token-free behavior tests. `task run -- <command>` runs inside the locked environment. `task package` uses `uv build --no-sources` to build the source distribution and wheel in `dist/`; `task build` still builds the Docker image.
 
-The package installs five commands: `gh-beads-sync` for one-shot/periodic sync and progress inspection, `gh-beads-mcp` for the official MCP stdio/HTTP/SSE server, `gh-beads-runtime` for readiness and SQL account setup, `gh-beads-snapshot` for portfolio coverage and queues, and `gh-beads-triage` for saved decisions. From the checkout, run them through uv or the Task wrapper:
+The package installs one Click command, `gh-beads`, with subcommands: `gh-beads sync` for one-shot/periodic sync and progress inspection, `gh-beads mcp` for the official MCP stdio/HTTP/SSE server, `gh-beads runtime` for readiness and SQL account setup, `gh-beads snapshot` for portfolio coverage and queues, `gh-beads triage` for saved decisions, and `gh-beads skill` for listing, displaying, and installing agent skills. Use `gh-beads --help` to discover subcommands and `gh-beads SUBCOMMAND --help` for options. From the checkout, run them through uv or the Task wrapper:
 
 ```sh
-task run -- gh-beads-sync --help
-uv run --locked gh-beads-sync --status
+task run -- gh-beads sync --help
+uv run --locked gh-beads sync --status
 ```
 
 These commands default to the current repository; `BEADS_WORKING_DIR` can select another initialized workspace. Local sync/MCP requires the matching native `bd` CLI with embedded Dolt support. Docker sets an explicit workspace and SQL connection, installs the package non-editable with runtime dependencies only, then starts the same commands directly. No `PYTHONPATH` configuration is required.
@@ -17,7 +17,7 @@ These commands default to the current repository; `BEADS_WORKING_DIR` can select
 
 ## Local embedded deployment
 
-The [local guide](local.md) covers plain `bd init`, repository-local `.beads/embeddeddolt/` storage, uv polling, and a copyable client configuration. `gh-beads-mcp` defaults to stdio. Native `bd` opens the database directly, with no SQL listener or separate Dolt executable. All local processes share one repository workspace, sync lock, and progress file. `task smoke-local` validates embedded behavior, concurrent poller/MCP access, and persistence in a disposable repository using native `bd` and synthetic source records. Compose continues to select HTTP/SSE and its SQL server explicitly. Existing server-mode workspaces retain their configured connection and are not converted by these defaults.
+The [local guide](local.md) covers plain `bd init`, repository-local `.beads/embeddeddolt/` storage, uv polling, and a copyable client configuration. `gh-beads mcp` defaults to stdio. Native `bd` opens the database directly, with no SQL listener or separate Dolt executable. All local processes share one repository workspace, sync lock, and progress file. `task smoke-local` validates embedded behavior, concurrent poller/MCP access, and persistence in a disposable repository using native `bd` and synthetic source records. Compose continues to select HTTP/SSE and its SQL server explicitly. Existing server-mode workspaces retain their configured connection and are not converted by these defaults.
 
 ## Select repositories
 
@@ -42,7 +42,7 @@ To sync a specific set on demand, repeat `--repo OWNER/REPO`. These names replac
 
 ```sh
 # Local workspace
-uv run --locked gh-beads-sync --repo example/api --repo example/web
+uv run --locked gh-beads sync --repo example/api --repo example/web
 # Compose: repair only this repository
 task sync-now -- --repo example/api --full
 ```
@@ -120,7 +120,7 @@ The default Compose project name is `gh-beads`, with data in `gh-beads_data`. `C
 
 ### Upgrading an existing deployment after the rename
 
-The distribution is now `gh-beads`, Python imports use `gh_beads`, and installed commands use the `gh-beads-` prefix. Update scripts and MCP launch configurations, then run `task install` to refresh the locked environment. Native embedded workspaces retain their existing data and polling state; no database initialization is needed.
+The distribution is now `gh-beads`, Python imports use `gh_beads`, and the only installed command is `gh-beads`. Replace former `gh-beads-SUBCOMMAND` invocations with `gh-beads SUBCOMMAND` (for example, `gh-beads sync --status` and `gh-beads skill install`). In MCP clients, set the program to `gh-beads` and add `mcp` as its first argument, or append `"gh-beads", "mcp"` to the uv argument list. Update scripts and MCP launch configurations, then run `task install` to refresh the locked environment. The old console entrypoints are removed. Native embedded workspaces retain their existing data and polling state; no database initialization is needed.
 
 An existing Compose deployment must keep its original project/volume and SQL database. For the previous defaults, export `COMPOSE_PROJECT_NAME=beads-hub` and `GH_BEADS_DATABASE=beads_hub` before running Compose or Task commands. Stop the old services with their original project name before replacing them, and follow the [backup procedure](#backup-and-restore) with the actual existing volume and image names. Use the existing database name for SQL pointers too. Changing the default project name alone selects a new empty volume; it does not move data. Never reinitialize the existing workspace. New deployments use `gh-beads_data` and `gh_beads`.
 
@@ -163,8 +163,8 @@ Start portfolio triage with one stored view:
 
 ```sh
 # Local initialized workspace; no token or network needed
-uv run --locked gh-beads-snapshot --json
-uv run --locked gh-beads-snapshot --repo example/api --repo example/web --limit 50
+uv run --locked gh-beads snapshot --json
+uv run --locked gh-beads snapshot --repo example/api --repo example/web --limit 50
 # Compose uses the poller workspace and its checkpoints
 task snapshot -- --limit 50
 ```
@@ -176,10 +176,10 @@ The JSON includes workspace/database identity, selection/coverage, repository li
 Record local decisions after applying desired priority/category changes with `bd`:
 
 ```sh
-uv run --locked gh-beads-triage BEAD_ID --reviewer agent \
+uv run --locked gh-beads triage BEAD_ID --reviewer agent \
   --rationale 'Failing checks block the release' --next-action 'Inspect failing test output'
 # Compose: same command against its workspace
-docker compose exec -T github-reconciler gh-beads-triage BEAD_ID --reviewer agent \
+docker compose exec -T github-reconciler gh-beads triage BEAD_ID --reviewer agent \
   --rationale 'Failing checks block the release' --next-action 'Inspect failing test output'
 ```
 
@@ -250,16 +250,16 @@ The hub pairs with the portable stewardship skill ([`skills/oss-steward/SKILL.md
 - **Companion tools for upstream actions:** Posting comments, submitting PR reviews, merging PRs, or closing issues must be executed through authorized companion tools (e.g., `gh issue comment`, `gh pr review`, `gh pr merge --match-head-commit <sha>`).
 - **Action receipts:** Whenever an upstream action is executed, record an action receipt in Beads (`bd note BEAD_ID "receipt: action=... actor=... target=... result=confirmed"`).
 - **Stewardship skill:** The [`oss-steward`](../skills/oss-steward/SKILL.md) skill guides agents through prompt injection defense (treating GitHub content as passive evidence), evaluating dependency upgrades, engaging external contributors, triaging bug reports, and managing feature requests.
-- **Installing for all agents:** The package installs `gh-beads-skill` (and helper `scripts/install-skill.sh`) to install the skill across agent environments:
+- **Installing for all agents:** The `gh-beads skill` subcommand (and helper `scripts/install-skill.sh`) installs the skill across agent environments:
   ```sh
-  gh-beads-skill list --json
-  gh-beads-skill show oss-steward --consolidated
-  gh-beads-skill install oss-steward --target workspace   # .agents/skills/oss-steward/
-  gh-beads-skill install oss-steward --target global      # ~/.agents/skills/ and ~/.gemini/antigravity-cli/skills/
-  gh-beads-skill install oss-steward --target claude      # .claude/skills/oss-steward/
-  gh-beads-skill install oss-steward --target cursor      # .cursor/rules/oss-steward.mdc
-  gh-beads-skill install oss-steward --target copilot     # .github/copilot-instructions.md
-  gh-beads-skill install oss-steward --target all         # Installs to all supported workspace formats
+  gh-beads skill list --json
+  gh-beads skill show oss-steward --consolidated
+  gh-beads skill install oss-steward --target workspace   # .agents/skills/oss-steward/
+  gh-beads skill install oss-steward --target global      # ~/.agents/skills/ and ~/.gemini/antigravity-cli/skills/
+  gh-beads skill install oss-steward --target claude      # .claude/skills/oss-steward/
+  gh-beads skill install oss-steward --target cursor      # .cursor/rules/oss-steward.mdc
+  gh-beads skill install oss-steward --target copilot     # .github/copilot-instructions.md
+  gh-beads skill install oss-steward --target all         # Installs to all supported workspace formats
   ```
 - **MCP agent access:** FastMCP serves the skill as tool `install_stewardship_skill`, resources `skills://oss-steward/SKILL.md` and `skills://oss-steward/references/{name}`, and prompt `oss_steward`.
 
@@ -295,7 +295,7 @@ docker run --rm --network none --entrypoint tar \
 # Inject BEADS_REMOTE_PASSWORD; leave GitHub polling offline during inspection.
 GH_TOKEN= BEADS_UI_PORT=0 BEADS_MCP_PORT=0 BEADS_SQL_PORT=0 \
   docker compose -p gh-beads-restore up -d --wait --wait-timeout 180
-docker compose -p gh-beads-restore exec -T github-reconciler gh-beads-snapshot --json
+docker compose -p gh-beads-restore exec -T github-reconciler gh-beads snapshot --json
 ```
 
 Compare source/local fields, stable IDs/epic parents, dependency edges, claims, priorities, labels, notes, full triage history, and `.github-sync-state.json` to pre-backup records. Confirm the volume is the restore target. Promote only after verification and reconnecting intended clients. The sample leaves the restore available for inspection; stop it when finished without touching the source project.

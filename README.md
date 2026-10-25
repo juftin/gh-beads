@@ -80,7 +80,7 @@ Securely export your token and target repository:
 export GH_SYNC_QUERY='repo:owner/your-repo'
 
 # Run a single reconciliation pass
-uv run --locked gh-beads-sync
+uv run --locked gh-beads sync
 ```
 
 Expected output on success:
@@ -96,7 +96,7 @@ Pass complete in 2.1s.
 Now inspect your backlog through the portfolio snapshot:
 
 ```sh
-uv run --locked gh-beads-snapshot --json
+uv run --locked gh-beads snapshot --json
 ```
 
 The snapshot returns repository coverage, freshness, and bounded queues:
@@ -132,7 +132,7 @@ The snapshot returns repository coverage, freshness, and bounded queues:
 2. **Make a local triage decision:**
    Record your rationale and next action in Beads:
    ```sh
-   uv run --locked gh-beads-triage hub-1 \
+   uv run --locked gh-beads triage hub-1 \
      --reviewer maintainer \
      --rationale "Needs reproduction logs from reporter" \
      --next-action "Request verbose logs on GitHub"
@@ -158,20 +158,20 @@ The snapshot returns repository coverage, freshness, and bounded queues:
 
 - **Continuous polling:** Keep the local backlog up to date with a background worker:
   ```sh
-  uv run --locked gh-beads-sync --loop --interval 120
+  uv run --locked gh-beads sync --loop --interval 120
   ```
 - **Workspace selection:** The CLI and MCP tools default to the current directory. Set `BEADS_WORKING_DIR=/path/to/workspace` to keep your Beads data separate from this source checkout.
-- **Connect MCP:** Point your MCP client to `uv run --locked gh-beads-mcp` (stdio transport). It exposes official Beads tools along with `portfolio_snapshot`, `record_triage`, and `trigger_github_sync`. See the [local guide](docs/local.md#3-connect-a-stdio-mcp-client) for copyable client configurations.
-- **Install the Stewardship Skill:** The `oss-steward` skill is available out-of-the-box in [`.agents/skills/oss-steward/SKILL.md`](.agents/skills/oss-steward/SKILL.md) and [`skills/oss-steward/SKILL.md`](skills/oss-steward/SKILL.md). Install it into any repository or agent environment using the `gh-beads-skill` CLI:
+- **Connect MCP:** Point your MCP client to `uv run --locked gh-beads mcp` (stdio transport). It exposes official Beads tools along with `portfolio_snapshot`, `record_triage`, and `trigger_github_sync`. See the [local guide](docs/local.md#3-connect-a-stdio-mcp-client) for copyable client configurations.
+- **Install the Stewardship Skill:** The `oss-steward` skill is available out-of-the-box in [`.agents/skills/oss-steward/SKILL.md`](.agents/skills/oss-steward/SKILL.md) and [`skills/oss-steward/SKILL.md`](skills/oss-steward/SKILL.md). Install it into any repository or agent environment using the `gh-beads skill` CLI:
   ```sh
   # Install to project .agents/skills/ (for Antigravity and Agent Protocol agents):
-  uv run --locked gh-beads-skill install
+  uv run --locked gh-beads skill install
 
   # Install across all agent platforms (Antigravity, Claude Code, Cursor, Copilot):
-  uv run --locked gh-beads-skill install --target all
+  uv run --locked gh-beads skill install --target all
 
   # Install globally to user directories (~/.agents/skills/ and ~/.gemini/antigravity-cli/skills/):
-  uv run --locked gh-beads-skill install --target global
+  uv run --locked gh-beads skill install --target global
   ```
   The skill guides agents through prompt-injection defense, dependency reviews, contributor engagement, and action receipts. MCP clients can also call the `install_stewardship_skill` tool, read `skills://oss-steward/SKILL.md` directly, or load the `oss_steward` prompt.
 - **Capabilities & boundaries:** The hub is read-only toward GitHub and does not include an autonomous background scheduler. Upstream writes use your authorized companion tool, and scheduled follow-through runs through your agent runner. Contributor setup and developer commands remain in [usage documentation](docs/usage.md).
@@ -303,8 +303,8 @@ Native `bd` opens `.beads/embeddeddolt/` directly for each operation. The Python
 | Component | Lifetime |
 | --- | --- |
 | `.beads/embeddeddolt/` | Persistent local SQL database, opened directly by `bd` |
-| `uv run --locked gh-beads-sync --loop --interval 120` | One background poller while automatic GitHub updates are wanted |
-| `uv run --locked gh-beads-mcp` | Stdio session started and stopped by each MCP client |
+| `uv run --locked gh-beads sync --loop --interval 120` | One background poller while automatic GitHub updates are wanted |
+| `uv run --locked gh-beads mcp` | Stdio session started and stopped by each MCP client |
 
 The database stays on disk when both processes exit. Closing a client leaves polling independent, and reopening a client requires no database initialization. The stdio wrapper retains the official Beads tools and the hub's sync trigger. See [local setup and client configuration](docs/local.md#3-connect-a-stdio-mcp-client) for details. Existing SQL-server workspaces retain their configured backend; this default change does not migrate their data.
 
@@ -358,7 +358,7 @@ Supported scopes are inventory selectors, rather than arbitrary search queries:
 
 For example, set `GH_SYNC_QUERY='user:@me;org:example-team;repo:another-owner/project'` for overlapping scopes; duplicates are imported once. Both issues and PRs are always included. Search qualifiers such as `label:` or `is:open` are rejected.
 
-For a selected run, use `uv run --locked gh-beads-sync --repo example/api --repo example/web`, or `task sync-now -- --repo example/api --full` in Compose. Repeated `--repo` flags replace configured scopes for that command and also work with `--loop`. MCP clients can call `trigger_github_sync` with `{"repositories": ["example/api", "example/web"]}`; omitting the list uses configured scopes. Unselected imports and checkpoints are retained. To persist selection for the periodic worker, configure `GH_SYNC_QUERY` with explicit `repo:` scopes. See [repository selection](docs/usage.md#select-repositories).
+For a selected run, use `uv run --locked gh-beads sync --repo example/api --repo example/web`, or `task sync-now -- --repo example/api --full` in Compose. Repeated `--repo` flags replace configured scopes for that command and also work with `--loop`. MCP clients can call `trigger_github_sync` with `{"repositories": ["example/api", "example/web"]}`; omitting the list uses configured scopes. Unselected imports and checkpoints are retained. To persist selection for the periodic worker, configure `GH_SYNC_QUERY` with explicit `repo:` scopes. See [repository selection](docs/usage.md#select-repositories).
 
 The SQL password must remain available when loading Compose configuration for operational tasks. `task validate` uses the quiet Compose check so credentials are not printed. See [deployment guidance](docs/usage.md#deploy-with-docker-compose) for custom image tags, password rotation, and port configuration.
 
@@ -366,9 +366,9 @@ The SQL password must remain available when loading Compose configuration for op
 
 ### Portfolio snapshot and saved reviews
 
-Start with `uv run --locked gh-beads-snapshot --json` locally or `task snapshot` in Compose. It returns repository links, coverage/ages/errors, source and local totals, and bounded ready, blocked, in-progress, attention, unreviewed, and changed-since-review queues. Repeat `--repo OWNER/REPO` to select repositories; `--limit 50` expands each queue. Inspect `total` and `truncated`; stored success does not establish live freshness.
+Start with `uv run --locked gh-beads snapshot --json` locally or `task snapshot` in Compose. It returns repository links, coverage/ages/errors, source and local totals, and bounded ready, blocked, in-progress, attention, unreviewed, and changed-since-review queues. Repeat `--repo OWNER/REPO` to select repositories; `--limit 50` expands each queue. Inspect `total` and `truncated`; stored success does not establish live freshness.
 
-Save a decision with `uv run --locked gh-beads-triage BEAD_ID --reviewer agent --rationale 'Reason' --next-action 'Next step'`. Reviews retain history under local `metadata.triage`, survive sync, and flag changed source evidence. Add `--expected-fingerprint` from the snapshot to guard against reviewing newer imported evidence. See [snapshot and review usage](docs/usage.md#portfolio-snapshot-and-saved-decisions).
+Save a decision with `uv run --locked gh-beads triage BEAD_ID --reviewer agent --rationale 'Reason' --next-action 'Next step'`. Reviews retain history under local `metadata.triage`, survive sync, and flag changed source evidence. Add `--expected-fingerprint` from the snapshot to guard against reviewing newer imported evidence. See [snapshot and review usage](docs/usage.md#portfolio-snapshot-and-saved-decisions).
 
 ### Beads CLI
 
@@ -407,7 +407,7 @@ The official server provides tools such as `ready`, `list`, `show`, `create`, `c
 
 ## Operations and troubleshooting
 
-For the local workspace, use `uv run --locked gh-beads-sync --status` and `uv run --locked gh-beads-sync --full`. The Task commands below operate the Compose deployment:
+For the local workspace, use `uv run --locked gh-beads sync --status` and `uv run --locked gh-beads sync --full`. The Task commands below operate the Compose deployment:
 
 ```sh
 task sync-now
@@ -441,9 +441,10 @@ Application code lives in `src/gh_beads` and uses the `uv_build` backend. Develo
 ```text
 src/gh_beads/
 ├── __init__.py
+├── cli.py          # Click group and all subcommands
 ├── github.py       # GitHubKit requests, pagination, source snapshots, bounded reads
 ├── description.py  # Linked Markdown tables, source escaping, attention summaries
-├── sync.py         # Beads CLI adapter, ownership rules, reconciliation, polling CLI
+├── sync.py         # Beads CLI adapter, ownership rules, reconciliation
 ├── state.py        # Incremental cursors, discovered inventories, atomic progress
 ├── snapshot.py     # Stored coverage, rollups, and bounded portfolio queues
 ├── triage.py       # Local review history and source-change fingerprints
@@ -458,13 +459,16 @@ pyproject.toml      # Package metadata, commands, dependencies, and quality sett
 uv.lock             # Locked Python dependency resolution
 ```
 
-| Installed command | Purpose |
+The package installs one Click command, `gh-beads`. Use `gh-beads --help` to discover its subcommands. Former `gh-beads-SUBCOMMAND` invocations become `gh-beads SUBCOMMAND`; update MCP launch arguments and scripts after reinstalling.
+
+| Subcommand | Purpose |
 | --- | --- |
-| `gh-beads-sync` | One-shot/periodic reconciliation, `--full` repair, and `--status` |
-| `gh-beads-mcp` | Start the official MCP stdio/HTTP/SSE server after hub readiness |
-| `gh-beads-snapshot` | Read stored portfolio counts, bounded queues, and review changes |
-| `gh-beads-triage` | Append a local review with rationale, next action, and source fingerprint |
-| `gh-beads-runtime` | Wait for SQL/hub readiness or provision the remote SQL account |
+| `gh-beads sync` | One-shot/periodic reconciliation, `--full` repair, and `--status` |
+| `gh-beads mcp` | Start the official MCP stdio/HTTP/SSE server after hub readiness |
+| `gh-beads snapshot` | Read stored portfolio counts, bounded queues, and review changes |
+| `gh-beads triage` | Append a local review with rationale, next action, and source fingerprint |
+| `gh-beads runtime` | Wait for SQL/hub readiness or provision the remote SQL account |
+| `gh-beads skill list/show/install` | Discover, inspect, or install agent skills |
 
 Use Task for the same flags and environment as the project workflows:
 
@@ -479,8 +483,8 @@ task smoke-local  # Native bd: disposable embedded database and concurrent stdio
 task smoke-restore # Native bd: offline backup and independent restore verification
 task smoke        # Disposable Compose stack, restart, and independent volume restore
 
-task run -- gh-beads-sync --help
-uv run --locked gh-beads-sync --status
+task run -- gh-beads sync --help
+uv run --locked gh-beads sync --status
 ```
 
 Running sync or MCP locally requires an initialized hub and the matching `bd` CLI. `--status` reads progress without contacting GitHub. Tests import the installed package without source-path overrides. Add dependencies with `uv add`, commit `uv.lock`, and use `task lock` when intentionally refreshing resolution. `task build` builds the Docker image; `task package` builds Python distributions.
